@@ -24,10 +24,20 @@ futures-util = { version = "0.3", default-features = false, features = ["sink"] 
 interprocess = { version = "2", features = ["tokio"] }
 tokio = { version = "1", features = ["rt", "macros", "time"] }
 tokio-util = { version = "0.7", features = ["codec"] }
-ort = { version = "2.0.0-rc.11", features = ["ndarray", "load-dynamic"] }
 tokenizers = { version = "0.22", default-features = false, features = ["fancy-regex"] }
 hf-hub = { version = "0.4", features = ["ureq", "rustls-tls"] }
-ndarray = "0.17"
+
+# ML backends (optional)
+ort = { version = "2.0.0-rc.11", features = ["ndarray", "load-dynamic"], optional = true }
+ndarray = { version = "0.17", optional = true }
+candle-core = { version = "0.9", optional = true }
+candle-nn = { version = "0.9", optional = true }
+candle-transformers = { version = "0.9", optional = true }
+
+[features]
+default = ["onnx"]
+onnx = ["dep:ort", "dep:ndarray"]
+candle = ["dep:candle-core", "dep:candle-nn", "dep:candle-transformers"]
 
 [lints.clippy]
 nursery = { level = "deny", priority = -1 }

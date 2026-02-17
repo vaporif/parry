@@ -73,10 +73,7 @@ pub fn scan_text_fast(text: &str) -> ScanResult {
 }
 
 fn try_ml_scan(text: &str, config: &Config) -> Result<bool> {
-    use crate::model;
-
-    let paths = model::ensure_model(config)?;
-    let mut scanner = ml::MlScanner::new(&paths.model, &paths.tokenizer, config.threshold)?;
+    let mut scanner = ml::MlScanner::load(config)?;
     scanner.scan_chunked(text)
 }
 
@@ -90,6 +87,7 @@ mod tests {
             hf_token_path: PathBuf::from("/nonexistent"),
             threshold: 0.5,
             no_daemon: true,
+            ml_backend: crate::config::MlBackendKind::Auto,
         }
     }
 

@@ -1,4 +1,5 @@
 use clap::{Parser, Subcommand};
+use parry_cli::config::MlBackendKind;
 use std::path::PathBuf;
 
 fn threshold_in_range(s: &str) -> Result<f32, String> {
@@ -29,6 +30,10 @@ pub struct Cli {
     /// Disable daemon communication (always scan inline)
     #[arg(long, env = "PARRY_NO_DAEMON")]
     pub no_daemon: bool,
+
+    /// ML backend to use
+    #[arg(long, env = "PARRY_ML_BACKEND", default_value = "auto", value_enum)]
+    pub ml_backend: MlBackendKind,
 
     #[command(subcommand)]
     pub command: Option<Command>,

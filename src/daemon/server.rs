@@ -70,8 +70,7 @@ pub async fn run(config: &Config, daemon_config: &DaemonConfig) -> eyre::Result<
 
 fn load_ml_scanner(config: &Config) -> Option<scan::ml::MlScanner> {
     let result = std::panic::catch_unwind(std::panic::AssertUnwindSafe(|| {
-        let paths = crate::model::ensure_model(config).ok()?;
-        scan::ml::MlScanner::new(&paths.model, &paths.tokenizer, config.threshold).ok()
+        scan::ml::MlScanner::load(config).ok()
     }));
     result.unwrap_or(None)
 }

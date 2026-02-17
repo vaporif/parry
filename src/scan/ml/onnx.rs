@@ -1,0 +1,37 @@
+use crate::error::Result;
+use ort::session::Session;
+use ort::value::Tensor;
+
+pub struct OnnxBackend {
+    session: Session,
+}
+
+impl OnnxBackend {
+    /// # Errors
+    ///
+    /// Returns an error if the ONNX session cannot be loaded.
+    pub fn load(model_path: &str) -> Result<Self> {
+        let session = Session::builder()?.commit_from_file(model_path)?;
+        Ok(Self { session })
+    }
+}
+
+impl super::backend::MlBackend for OnnxBackend {
+    fn score(&mut self, input_ids: &[u32], attention_mask: &[u32]) -> Result<f32> {
+        let ids: Vec<i64> = input_ids.iter().map(|&id| i64::from(id)).collect();
+        let mask: Vec<i64> = attention_mask.iter().map(|&m| i64::from(m)).collect();
+        let len = i64::try_from(ids.len())?;
+        let shape = vec![1i64, len];
+        let input_ids_tensor = Tensor::from_array((shape.clone(), ids))?;
+        let attention_mask_tensor = Tensor::from_array((shape, mask))?;
+
+        let outputs = self
+            .session
+            .run(ort::inputs![input_ids_tensor, attention_mask_tensor])?;
+
+        let logits_view = outputs[0].try_extract_array::<f32>()?;
+        let logits = logits_view.as_slice().expect("contiguous logits tensor");
+
+        Ok(super::softmax_injection_prob(logits))
+    }
+}

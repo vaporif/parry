@@ -23,6 +23,7 @@ fn main() -> ExitCode {
         hf_token_path: cli.hf_token_path,
         threshold: cli.threshold,
         no_daemon: cli.no_daemon,
+        ml_backend: cli.ml_backend,
     };
 
     match cli.command {
