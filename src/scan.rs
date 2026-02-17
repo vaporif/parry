@@ -1,4 +1,5 @@
 pub mod chunker;
+pub mod decode;
 pub mod ml;
 pub mod secrets;
 pub mod substring;
@@ -67,6 +68,16 @@ pub fn scan_text_fast(text: &str) -> ScanResult {
 
     if secrets::has_secret(&stripped) {
         return ScanResult::Secret;
+    }
+
+    // Scan normalized + decoded variants
+    for variant in decode::decode_variants(&stripped) {
+        if substring::has_security_substring(&variant) {
+            return ScanResult::Injection;
+        }
+        if secrets::has_secret(&variant) {
+            return ScanResult::Secret;
+        }
     }
 
     ScanResult::Clean
