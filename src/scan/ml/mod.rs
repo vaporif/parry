@@ -77,7 +77,7 @@ impl MlScanner {
     }
 }
 
-#[allow(clippy::needless_return)]
+#[allow(clippy::needless_return, unused_variables)]
 fn load_auto_backend(repo: &hf_hub::api::sync::ApiRepo) -> Result<Box<dyn MlBackend>> {
     #[cfg(feature = "candle")]
     return load_candle_backend(repo);
@@ -127,6 +127,7 @@ fn load_candle_backend(_repo: &hf_hub::api::sync::ApiRepo) -> Result<Box<dyn MlB
     ))
 }
 
+#[cfg(any(feature = "onnx", feature = "candle", test))]
 pub(crate) fn softmax_injection_prob(logits: &[f32]) -> f32 {
     if logits.len() < 2 {
         return 0.0;
