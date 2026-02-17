@@ -1,0 +1,45 @@
+#[cfg(feature = "ml")]
+use crate::config::Config;
+#[cfg(feature = "ml")]
+use crate::error::{Error, Result};
+
+#[cfg(feature = "ml")]
+const MODEL_REPO: &str = "ProtectAI/deberta-v3-small-prompt-injection-v2";
+#[cfg(feature = "ml")]
+const MODEL_FILE: &str = "onnx/model.onnx";
+#[cfg(feature = "ml")]
+const TOKENIZER_FILE: &str = "tokenizer.json";
+
+#[cfg(feature = "ml")]
+pub struct ModelPaths {
+    pub model: String,
+    pub tokenizer: String,
+}
+
+#[cfg(feature = "ml")]
+pub fn ensure_model(config: &Config) -> Result<ModelPaths> {
+    use hf_hub::api::sync::ApiBuilder;
+
+    let mut builder = ApiBuilder::new();
+    if let Some(token) = config.hf_token() {
+        builder = builder.with_token(Some(token));
+    }
+    let api = builder
+        .build()
+        .map_err(|e| Error::ModelNotAvailable(e.to_string()))?;
+
+    let repo = api.model(MODEL_REPO.to_string());
+
+    let model_path = repo
+        .get(MODEL_FILE)
+        .map_err(|e| Error::ModelNotAvailable(format!("model download failed: {e}")))?;
+
+    let tokenizer_path = repo
+        .get(TOKENIZER_FILE)
+        .map_err(|e| Error::ModelNotAvailable(format!("tokenizer download failed: {e}")))?;
+
+    Ok(ModelPaths {
+        model: model_path.to_string_lossy().into_owned(),
+        tokenizer: tokenizer_path.to_string_lossy().into_owned(),
+    })
+}

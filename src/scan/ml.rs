@@ -1,0 +1,105 @@
+#[cfg(feature = "ml")]
+use crate::error::Result;
+
+#[cfg(feature = "ml")]
+use ort::session::Session;
+#[cfg(feature = "ml")]
+use ort::value::Tensor;
+#[cfg(feature = "ml")]
+use tokenizers::Tokenizer;
+
+#[cfg(feature = "ml")]
+pub struct MlScanner {
+    session: Session,
+    tokenizer: Tokenizer,
+    threshold: f32,
+}
+
+#[cfg(feature = "ml")]
+impl MlScanner {
+    pub fn new(model_path: &str, tokenizer_path: &str, threshold: f32) -> Result<Self> {
+        let session = Session::builder()?.commit_from_file(model_path)?;
+        let tokenizer = Tokenizer::from_file(tokenizer_path)?;
+
+        Ok(Self {
+            session,
+            tokenizer,
+            threshold,
+        })
+    }
+
+    /// Score a single text chunk. Returns probability of injection (label 1).
+    fn score(&mut self, text: &str) -> Result<f32> {
+        let encoding = self.tokenizer.encode(text, true)?;
+
+        let ids: Vec<i64> = encoding.get_ids().iter().map(|&id| id as i64).collect();
+        let mask: Vec<i64> = encoding
+            .get_attention_mask()
+            .iter()
+            .map(|&m| m as i64)
+            .collect();
+        let len = ids.len();
+
+        let shape = vec![1i64, len as i64];
+        let input_ids = Tensor::from_array((shape.clone(), ids))?;
+        let attention_mask = Tensor::from_array((shape, mask))?;
+
+        let outputs = self.session.run(ort::inputs![input_ids, attention_mask])?;
+
+        let logits_view = outputs[0].try_extract_array::<f32>()?;
+        let logits = logits_view.as_slice().expect("contiguous logits tensor");
+
+        Ok(softmax_injection_prob(logits))
+    }
+
+    /// Scan text using chunked strategy. Returns true if injection detected.
+    pub fn scan_chunked(&mut self, text: &str) -> Result<bool> {
+        use crate::scan::chunker;
+
+        for chunk in chunker::chunks(text) {
+            if self.score(chunk)? >= self.threshold {
+                return Ok(true);
+            }
+        }
+
+        if let Some((head_tail, _)) = chunker::head_tail(text) {
+            if self.score(&head_tail)? >= self.threshold {
+                return Ok(true);
+            }
+        }
+
+        Ok(false)
+    }
+}
+
+#[cfg(feature = "ml")]
+fn softmax_injection_prob(logits: &[f32]) -> f32 {
+    if logits.len() < 2 {
+        return 0.0;
+    }
+    let max = logits.iter().cloned().fold(f32::NEG_INFINITY, f32::max);
+    let exps: Vec<f32> = logits.iter().map(|&l| (l - max).exp()).collect();
+    let sum: f32 = exps.iter().sum();
+    exps[1] / sum // label 1 = INJECTION
+}
+
+#[cfg(test)]
+#[cfg(feature = "ml")]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn softmax_basic() {
+        let logits = [2.0, 1.0];
+        let prob = softmax_injection_prob(&logits);
+        assert!(prob > 0.0 && prob < 1.0);
+        assert!(prob < 0.5); // logit[0] > logit[1] means injection prob < 0.5
+    }
+
+    #[test]
+    fn softmax_injection_dominant() {
+        let logits = [0.0, 5.0];
+        let prob = softmax_injection_prob(&logits);
+        assert!(prob > 0.9);
+    }
+}
