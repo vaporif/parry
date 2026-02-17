@@ -1,14 +1,11 @@
 pub mod chunker;
-#[cfg(feature = "ml")]
 pub mod ml;
 pub mod secrets;
 pub mod substring;
 pub mod unicode;
 
-#[cfg(feature = "ml")]
-use crate::error::Result;
-
 use crate::config::Config;
+use crate::error::Result;
 
 /// Result of scanning text for prompt injection or secrets.
 pub enum ScanResult {
@@ -34,17 +31,13 @@ pub fn scan_text(text: &str, config: &Config) -> ScanResult {
         return fast;
     }
 
-    #[cfg(feature = "ml")]
-    {
-        match try_ml_scan(&unicode::strip_invisible(text), config) {
-            Ok(true) => return ScanResult::Injection,
-            Ok(false) => {}
-            Err(_) => {} // fail-open: ML errors don't block
-        }
+    // fail-open: ML panics (e.g. missing ONNX dylib) and errors don't block
+    let ml_result = std::panic::catch_unwind(std::panic::AssertUnwindSafe(|| {
+        try_ml_scan(&unicode::strip_invisible(text), config)
+    }));
+    if let Ok(Ok(true)) = ml_result {
+        return ScanResult::Injection;
     }
-
-    #[cfg(not(feature = "ml"))]
-    let _ = config;
 
     ScanResult::Clean
 }
@@ -67,7 +60,6 @@ pub fn scan_text_fast(text: &str) -> ScanResult {
     ScanResult::Clean
 }
 
-#[cfg(feature = "ml")]
 fn try_ml_scan(text: &str, config: &Config) -> Result<bool> {
     use crate::model;
 

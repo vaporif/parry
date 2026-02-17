@@ -6,11 +6,9 @@ pub enum Error {
     #[error("JSON error: {0}")]
     Json(#[from] serde_json::Error),
 
-    #[cfg(feature = "ml")]
     #[error("ONNX runtime error: {0}")]
     Ort(#[from] ort::Error),
 
-    #[cfg(feature = "ml")]
     #[error("Tokenizer error: {0}")]
     Tokenizer(Box<dyn std::error::Error + Send + Sync>),
 
@@ -18,7 +16,6 @@ pub enum Error {
     ModelNotAvailable(String),
 }
 
-#[cfg(feature = "ml")]
 impl From<Box<dyn std::error::Error + Send + Sync>> for Error {
     fn from(e: Box<dyn std::error::Error + Send + Sync>) -> Self {
         Error::Tokenizer(e)

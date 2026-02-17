@@ -1,22 +1,15 @@
-#[cfg(feature = "ml")]
 use crate::config::Config;
-#[cfg(feature = "ml")]
 use crate::error::{Error, Result};
 
-#[cfg(feature = "ml")]
 const MODEL_REPO: &str = "ProtectAI/deberta-v3-small-prompt-injection-v2";
-#[cfg(feature = "ml")]
 const MODEL_FILE: &str = "onnx/model.onnx";
-#[cfg(feature = "ml")]
 const TOKENIZER_FILE: &str = "tokenizer.json";
 
-#[cfg(feature = "ml")]
 pub struct ModelPaths {
     pub model: String,
     pub tokenizer: String,
 }
 
-#[cfg(feature = "ml")]
 pub fn ensure_model(config: &Config) -> Result<ModelPaths> {
     use hf_hub::api::sync::ApiBuilder;
 

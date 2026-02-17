@@ -5,14 +5,14 @@ use parry_cli::config::Config;
 use parry_cli::hook;
 use parry_cli::scan;
 use std::io::Read;
-use std::process;
+use std::process::ExitCode;
 
-fn main() {
-    // Fail-open: any panic exits 0 (clean)
+fn main() -> ExitCode {
+    // Fail-open: any panic exits clean
     let default_hook = std::panic::take_hook();
     std::panic::set_hook(Box::new(move |info| {
         default_hook(info);
-        process::exit(0);
+        std::process::exit(0);
     }));
 
     let cli = cli::Cli::parse();
@@ -22,46 +22,44 @@ fn main() {
         threshold: cli.threshold,
     };
 
-    let exit_code = match cli.command {
+    match cli.command {
         Some(cli::Command::Hook) => run_hook(&config),
         Some(cli::Command::Scan) | None => run_scan(&config),
-    };
-
-    process::exit(exit_code);
+    }
 }
 
-fn run_scan(config: &Config) -> i32 {
+fn run_scan(config: &Config) -> ExitCode {
     let mut text = String::new();
     if std::io::stdin().read_to_string(&mut text).is_err() {
-        return 0; // fail-open
+        return ExitCode::SUCCESS; // fail-open
     }
 
     let text = text.trim();
     if text.is_empty() {
-        return 0;
+        return ExitCode::SUCCESS;
     }
 
-    if !scan::scan_text(text, config).is_clean() {
-        1
+    if scan::scan_text(text, config).is_clean() {
+        ExitCode::SUCCESS
     } else {
-        0
+        ExitCode::FAILURE
     }
 }
 
-fn run_hook(config: &Config) -> i32 {
+fn run_hook(config: &Config) -> ExitCode {
     let mut input = String::new();
     if std::io::stdin().read_to_string(&mut input).is_err() {
-        return 0; // fail-open
+        return ExitCode::SUCCESS; // fail-open
     }
 
     let input = input.trim();
     if input.is_empty() {
-        return 0;
+        return ExitCode::SUCCESS;
     }
 
     let hook_input: hook::HookInput = match serde_json::from_str(input) {
         Ok(v) => v,
-        Err(_) => return 0, // fail-open on bad JSON
+        Err(_) => return ExitCode::SUCCESS, // fail-open on bad JSON
     };
 
     if let Some(output) = hook::post_tool_use::process(&hook_input, config) {
@@ -70,5 +68,5 @@ fn run_hook(config: &Config) -> i32 {
         }
     }
 
-    0 // hooks always exit 0
+    ExitCode::SUCCESS // hooks always exit clean
 }

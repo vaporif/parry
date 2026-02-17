@@ -2,17 +2,13 @@
 name = "parry-cli"
 version = "0.1.0"
 edition = "2021"
-description = "Prompt injection scanner — regex, unicode, and ML detection"
+description = "Prompt injection scanner — substring, unicode, secrets, and ML detection"
 license = "MIT"
 repository = "https://github.com/vaporif/parry"
 
 [[bin]]
 name = "parry"
 path = "src/main.rs"
-
-[features]
-default = ["ml"]
-ml = ["dep:ort", "dep:tokenizers", "dep:hf-hub", "dep:ndarray"]
 
 [dependencies]
 clap = { version = "4", features = ["derive", "env"] }
@@ -23,7 +19,7 @@ aho-corasick = "1"
 unicode-general-category = "1"
 thiserror = "2"
 
-ort = { version = "2.0.0-rc.11", features = ["ndarray", "load-dynamic"], optional = true }
-tokenizers = { version = "0.22", default-features = false, features = ["fancy-regex"], optional = true }
-hf-hub = { version = "0.4", features = ["ureq", "rustls-tls"], optional = true }
-ndarray = { version = "0.17", optional = true }
+ort = { version = "2.0.0-rc.11", features = ["ndarray", "load-dynamic"] }
+tokenizers = { version = "0.22", default-features = false, features = ["fancy-regex"] }
+hf-hub = { version = "0.4", features = ["ureq", "rustls-tls"] }
+ndarray = "0.17"

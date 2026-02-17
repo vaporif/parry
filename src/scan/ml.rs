@@ -1,21 +1,15 @@
-#[cfg(feature = "ml")]
 use crate::error::Result;
 
-#[cfg(feature = "ml")]
 use ort::session::Session;
-#[cfg(feature = "ml")]
 use ort::value::Tensor;
-#[cfg(feature = "ml")]
 use tokenizers::Tokenizer;
 
-#[cfg(feature = "ml")]
 pub struct MlScanner {
     session: Session,
     tokenizer: Tokenizer,
     threshold: f32,
 }
 
-#[cfg(feature = "ml")]
 impl MlScanner {
     pub fn new(model_path: &str, tokenizer_path: &str, threshold: f32) -> Result<Self> {
         let session = Session::builder()?.commit_from_file(model_path)?;
@@ -72,7 +66,6 @@ impl MlScanner {
     }
 }
 
-#[cfg(feature = "ml")]
 fn softmax_injection_prob(logits: &[f32]) -> f32 {
     if logits.len() < 2 {
         return 0.0;
@@ -84,7 +77,6 @@ fn softmax_injection_prob(logits: &[f32]) -> f32 {
 }
 
 #[cfg(test)]
-#[cfg(feature = "ml")]
 mod tests {
     use super::*;
 
