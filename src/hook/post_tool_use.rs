@@ -37,7 +37,7 @@ pub fn process(input: &HookInput, config: &Config) -> Option<HookOutput> {
             return None;
         }
 
-        if scan::scan_text(response, &no_ml_config(config)).is_injection() {
+        if scan::scan_text_fast(response).is_injection() {
             return Some(HookOutput::warning(WARNING_MSG));
         }
     } else if WEB_TOOLS.contains(&input.tool_name.as_str()) {
@@ -55,15 +55,6 @@ fn has_scannable_extension(path: &str) -> bool {
     SCANNABLE_EXTENSIONS.iter().any(|ext| lower.ends_with(ext))
 }
 
-/// Create a config copy with ML disabled (for fast regex-only scans).
-fn no_ml_config(config: &Config) -> Config {
-    Config {
-        hf_token_path: config.hf_token_path.clone(),
-        threshold: config.threshold,
-        no_ml: true,
-    }
-}
-
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -73,7 +64,6 @@ mod tests {
         Config {
             hf_token_path: PathBuf::from("/nonexistent"),
             threshold: 0.5,
-            no_ml: true,
         }
     }
 

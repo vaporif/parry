@@ -20,7 +20,6 @@ fn main() {
     let config = Config {
         hf_token_path: cli.hf_token_path,
         threshold: cli.threshold,
-        no_ml: cli.no_ml || cfg!(not(feature = "ml")),
     };
 
     let exit_code = match cli.command {

@@ -21,32 +21,37 @@ impl ScanResult {
     }
 }
 
-/// Run all enabled scans on the given text. Returns Injection if any scanner triggers.
+/// Run all scans (unicode + regex + ML) on the given text.
 pub fn scan_text(text: &str, config: &Config) -> ScanResult {
-    // Check invisible unicode
-    if unicode::has_invisible_unicode(text) {
-        return ScanResult::Injection;
+    if let result @ ScanResult::Injection = scan_text_fast(text) {
+        return result;
     }
 
-    // Strip invisible chars then check regex
-    let stripped = unicode::strip_invisible(text);
-    if regex::has_injection(&stripped) {
-        return ScanResult::Injection;
-    }
-
-    // ML scan (if enabled and not disabled by config)
     #[cfg(feature = "ml")]
-    if !config.no_ml {
-        match try_ml_scan(&stripped, config) {
+    {
+        match try_ml_scan(&unicode::strip_invisible(text), config) {
             Ok(true) => return ScanResult::Injection,
             Ok(false) => {}
             Err(_) => {} // fail-open: ML errors don't block
         }
     }
 
-    // Suppress unused warning when ml feature is off
     #[cfg(not(feature = "ml"))]
     let _ = config;
+
+    ScanResult::Clean
+}
+
+/// Fast scan using unicode + regex only (no ML). Used for local file reads in hook mode.
+pub fn scan_text_fast(text: &str) -> ScanResult {
+    if unicode::has_invisible_unicode(text) {
+        return ScanResult::Injection;
+    }
+
+    let stripped = unicode::strip_invisible(text);
+    if regex::has_injection(&stripped) {
+        return ScanResult::Injection;
+    }
 
     ScanResult::Clean
 }
@@ -69,7 +74,6 @@ mod tests {
         Config {
             hf_token_path: PathBuf::from("/nonexistent"),
             threshold: 0.5,
-            no_ml: true,
         }
     }
 

@@ -26,10 +26,6 @@ pub struct Cli {
           value_parser = threshold_in_range)]
     pub threshold: f32,
 
-    /// Disable ML scanning (regex + unicode only)
-    #[arg(long, env = "CLAUDE_GUARD_NO_ML")]
-    pub no_ml: bool,
-
     #[command(subcommand)]
     pub command: Option<Command>,
 }
