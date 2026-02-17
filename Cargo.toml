@@ -23,6 +23,8 @@ data-encoding = "2"
 percent-encoding = "2"
 html-escape = "0.2"
 eyre = "0.6"
+tree-sitter = "0.25"
+tree-sitter-bash = "0.25"
 
 bytes = "1"
 futures-util = { version = "0.3", default-features = false, features = ["sink"] }

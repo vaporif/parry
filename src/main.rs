@@ -67,7 +67,14 @@ fn run_hook(config: &Config) -> ExitCode {
         Err(_) => return ExitCode::SUCCESS, // fail-open on bad JSON
     };
 
-    if let Some(output) = hook::post_tool_use::process(&hook_input, config) {
+    // Auto-detect: tool_response present → PostToolUse, absent → PreToolUse
+    if hook_input.tool_response.is_some() {
+        if let Some(output) = hook::post_tool_use::process(&hook_input, config) {
+            if let Ok(json) = serde_json::to_string(&output) {
+                println!("{json}");
+            }
+        }
+    } else if let Some(output) = hook::pre_tool_use::process(&hook_input) {
         if let Ok(json) = serde_json::to_string(&output) {
             println!("{json}");
         }

@@ -1,5 +1,6 @@
 pub mod chunker;
 pub mod decode;
+pub mod exfil;
 pub mod ml;
 pub mod secrets;
 pub mod substring;
