@@ -1,11 +1,14 @@
-use std::time::{Duration, Instant};
+use std::time::Duration;
+
+use futures_util::{SinkExt, StreamExt};
+use interprocess::local_socket::traits::tokio::Listener as _;
+use tokio::time::Instant;
+use tokio_util::codec::Framed;
 
 use crate::config::Config;
-use crate::daemon::protocol::{self, ScanRequest, ScanResponse, ScanType};
-use crate::daemon::transport::{self, Listener, Stream};
+use crate::daemon::protocol::{DaemonCodec, ScanRequest, ScanResponse, ScanType};
+use crate::daemon::transport;
 use crate::scan;
-
-const POLL_INTERVAL: Duration = Duration::from_millis(100);
 
 pub struct DaemonConfig {
     pub idle_timeout: Duration,
@@ -16,19 +19,16 @@ pub struct DaemonConfig {
 /// # Errors
 ///
 /// Returns an error if another daemon is running or the socket cannot be bound.
-pub fn run(config: &Config, daemon_config: &DaemonConfig) -> eyre::Result<()> {
-    // Check for existing daemon
+pub async fn run(config: &Config, daemon_config: &DaemonConfig) -> eyre::Result<()> {
     if crate::daemon::client::is_daemon_running() {
         return Err(eyre::eyre!("another daemon is already running"));
     }
 
-    let listener = Listener::bind()?;
+    let listener = transport::bind_async()?;
 
-    // Write PID file
     let pid_path = transport::pid_file_path()?;
     std::fs::write(&pid_path, std::process::id().to_string())?;
 
-    // Load ML model (fail-open: None if unavailable)
     let mut ml_scanner = load_ml_scanner(config);
 
     eprintln!(
@@ -41,30 +41,27 @@ pub fn run(config: &Config, daemon_config: &DaemonConfig) -> eyre::Result<()> {
         }
     );
 
-    let mut last_activity = Instant::now();
+    let idle_timeout = daemon_config.idle_timeout;
+    let mut deadline = Instant::now() + idle_timeout;
 
     loop {
-        if last_activity.elapsed() >= daemon_config.idle_timeout {
-            eprintln!("parry daemon idle timeout, shutting down");
-            break;
-        }
-
-        match listener.try_accept() {
-            Ok(Some(stream)) => {
-                last_activity = Instant::now();
-                handle_connection(stream, config, ml_scanner.as_mut());
+        tokio::select! {
+            result = listener.accept() => {
+                match result {
+                    Ok(stream) => {
+                        handle_connection(stream, &mut ml_scanner).await;
+                        deadline = Instant::now() + idle_timeout;
+                    }
+                    Err(e) => eprintln!("accept error: {e}"),
+                }
             }
-            Ok(None) => {
-                std::thread::sleep(POLL_INTERVAL);
-            }
-            Err(e) => {
-                eprintln!("accept error: {e}");
-                std::thread::sleep(POLL_INTERVAL);
+            () = tokio::time::sleep_until(deadline) => {
+                eprintln!("parry daemon idle timeout, shutting down");
+                break;
             }
         }
     }
 
-    // Cleanup (socket is auto-reclaimed on listener drop)
     drop(listener);
     let _ = std::fs::remove_file(&pid_path);
 
@@ -79,36 +76,33 @@ fn load_ml_scanner(config: &Config) -> Option<scan::ml::MlScanner> {
     result.unwrap_or(None)
 }
 
-fn handle_connection(
-    mut stream: Stream,
-    config: &Config,
-    ml_scanner: Option<&mut scan::ml::MlScanner>,
+async fn handle_connection(
+    stream: interprocess::local_socket::tokio::Stream,
+    ml_scanner: &mut Option<scan::ml::MlScanner>,
 ) {
-    let Ok(req) = protocol::read_request(&mut stream) else {
+    let mut framed = Framed::new(stream, DaemonCodec);
+
+    let Some(Ok(req)) = framed.next().await else {
         return;
     };
 
-    let resp = handle_request(&req, config, ml_scanner);
-
-    let _ = protocol::write_response(&mut stream, resp);
+    let resp = handle_request(&req, ml_scanner);
+    let _ = framed.send(resp).await;
 }
 
 fn handle_request(
     req: &ScanRequest,
-    _config: &Config,
-    ml_scanner: Option<&mut scan::ml::MlScanner>,
+    ml_scanner: &mut Option<scan::ml::MlScanner>,
 ) -> ScanResponse {
     match req.scan_type {
         ScanType::Ping => ScanResponse::Pong,
         ScanType::Fast => scan_result_to_response(&scan::scan_text_fast(&req.text)),
         ScanType::Full => {
-            // Fast scan first
             let fast = scan::scan_text_fast(&req.text);
             if !fast.is_clean() {
                 return scan_result_to_response(&fast);
             }
 
-            // ML scan if available
             if let Some(scanner) = ml_scanner {
                 let stripped = scan::unicode::strip_invisible(&req.text);
                 if matches!(scanner.scan_chunked(&stripped), Ok(true)) {

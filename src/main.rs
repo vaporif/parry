@@ -80,7 +80,18 @@ fn run_serve(config: &Config, idle_timeout: u64) -> ExitCode {
         idle_timeout: Duration::from_secs(idle_timeout),
     };
 
-    match daemon::server::run(config, &daemon_config) {
+    let rt = match tokio::runtime::Builder::new_current_thread()
+        .enable_time()
+        .build()
+    {
+        Ok(rt) => rt,
+        Err(e) => {
+            eprintln!("runtime error: {e}");
+            return ExitCode::FAILURE;
+        }
+    };
+
+    match rt.block_on(daemon::server::run(config, &daemon_config)) {
         Ok(()) => ExitCode::SUCCESS,
         Err(e) => {
             eprintln!("daemon error: {e}");

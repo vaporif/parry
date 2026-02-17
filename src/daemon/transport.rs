@@ -2,9 +2,7 @@ use std::io::{self, Read, Write};
 use std::path::PathBuf;
 use std::time::Duration;
 
-use interprocess::local_socket::{
-    prelude::*, GenericFilePath, GenericNamespaced, ListenerNonblockingMode, ListenerOptions,
-};
+use interprocess::local_socket::{prelude::*, GenericFilePath, GenericNamespaced, ListenerOptions};
 
 /// Returns the parry runtime directory (`~/.parry/`).
 /// Respects `PARRY_RUNTIME_DIR` env override for testing.
@@ -54,56 +52,33 @@ pub fn pid_file_path() -> io::Result<PathBuf> {
     Ok(parry_dir()?.join("daemon.pid"))
 }
 
-pub struct Listener {
-    inner: interprocess::local_socket::Listener,
+// ─── Async listener (for daemon server) ──────────────────────────────────────
+
+/// Create an async tokio listener for the daemon.
+///
+/// # Errors
+///
+/// Returns an error if the socket cannot be created.
+pub fn bind_async() -> io::Result<interprocess::local_socket::tokio::Listener> {
+    let dir = parry_dir()?;
+    std::fs::create_dir_all(&dir)?;
+
+    // Remove stale socket file (filesystem path sockets only)
+    if !GenericNamespaced::is_supported() {
+        let sock_path = dir.join("parry.sock");
+        if sock_path.exists() {
+            let _ = std::fs::remove_file(&sock_path);
+        }
+    }
+
+    let name = socket_name()?;
+    ListenerOptions::new().name(name).create_tokio()
 }
+
+// ─── Sync stream (for daemon client) ────────────────────────────────────────
 
 pub struct Stream {
     inner: interprocess::local_socket::Stream,
-}
-
-impl Listener {
-    /// Bind to the local socket for incoming daemon connections.
-    ///
-    /// # Errors
-    ///
-    /// Returns an error if the socket cannot be created.
-    pub fn bind() -> io::Result<Self> {
-        let dir = parry_dir()?;
-        std::fs::create_dir_all(&dir)?;
-
-        // Remove stale socket file (filesystem path sockets only)
-        if !GenericNamespaced::is_supported() {
-            let sock_path = dir.join("parry.sock");
-            if sock_path.exists() {
-                let _ = std::fs::remove_file(&sock_path);
-            }
-        }
-
-        let name = socket_name()?;
-        let inner = ListenerOptions::new()
-            .name(name)
-            .nonblocking(ListenerNonblockingMode::Accept)
-            .create_sync()?;
-
-        Ok(Self { inner })
-    }
-
-    /// Non-blocking accept.
-    ///
-    /// # Errors
-    ///
-    /// Returns an error on accept failure (other than `WouldBlock`).
-    pub fn try_accept(&self) -> io::Result<Option<Stream>> {
-        match self.inner.accept() {
-            Ok(stream) => {
-                stream.set_nonblocking(false)?;
-                Ok(Some(Stream { inner: stream }))
-            }
-            Err(e) if e.kind() == io::ErrorKind::WouldBlock => Ok(None),
-            Err(e) => Err(e),
-        }
-    }
 }
 
 impl Stream {
@@ -115,7 +90,6 @@ impl Stream {
     pub fn connect(timeout: Duration) -> io::Result<Self> {
         let name = socket_name()?;
         let inner = interprocess::local_socket::Stream::connect(name)?;
-        // Set timeouts so we don't hang if daemon is unresponsive
         let _ = inner.set_recv_timeout(Some(timeout));
         let _ = inner.set_send_timeout(Some(timeout));
         Ok(Self { inner })

@@ -19,7 +19,11 @@ aho-corasick = "1"
 unicode-general-category = "1"
 eyre = "0.6"
 
-interprocess = "2"
+bytes = "1"
+futures-util = { version = "0.3", default-features = false, features = ["sink"] }
+interprocess = { version = "2", features = ["tokio"] }
+tokio = { version = "1", features = ["rt", "macros", "time"] }
+tokio-util = { version = "0.7", features = ["codec"] }
 ort = { version = "2.0.0-rc.11", features = ["ndarray", "load-dynamic"] }
 tokenizers = { version = "0.22", default-features = false, features = ["fancy-regex"] }
 hf-hub = { version = "0.4", features = ["ureq", "rustls-tls"] }
