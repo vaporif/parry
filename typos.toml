@@ -1,0 +1,16 @@
+[default.extend-words]
+# Domain names and vendor names used in patterns
+Hashi = "Hashi"
+loca = "loca"
+# Candle API method name (from_mmaped_safetensors)
+mmaped = "mmaped"
+# Unicode zero-width joiner test strings ("ig\u200Bnore")
+nore = "nore"
+# Multilingual injection phrases (Spanish, German)
+ignora = "ignora"
+alle = "alle"
+als = "als"
+ein = "ein"
+
+[files]
+extend-exclude = []

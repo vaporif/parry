@@ -1,0 +1,12 @@
+#!/usr/bin/env bash
+set -e
+
+# Skip patterns (same as CI paths-ignore)
+skip_pattern='^(\.github/|\.githooks/|\.serena/|.*\.md$|\.gitignore$)'
+
+# Check if any formattable files are staged (excluding skip patterns)
+if git diff --cached --name-only | grep -vE "$skip_pattern" | grep -qE '\.(nix|lua|toml)$'; then
+    echo "Formatting..."
+    just fmt
+    git add -u
+fi

@@ -1,0 +1,108 @@
+# Parry Pattern Configuration
+# Copy to ~/.config/parry/patterns.toml to customize
+#
+# Defaults are compiled into the binary. This file only needs entries
+# you want to add or remove from the defaults.
+
+[sensitive_paths]
+# Add custom sensitive path patterns
+# add = [
+#     { pattern = ".custom-secret", kind = "path_segment" },
+#     { pattern = "/my/secret/dir", kind = "substring" },
+# ]
+#
+# Match kinds:
+#   path_segment - matches between path separators (default)
+#                  ".env" matches "/project/.env" but not ".environment"
+#   suffix       - matches at end of path
+#                  "/id_rsa" matches "~/.ssh/id_rsa" but not "id_rsa_backup"
+#   substring    - matches anywhere (use sparingly - high false positive risk)
+#
+# Remove built-in patterns you don't want
+# remove = [".env", "pastebin.com"]
+
+add = []
+remove = []
+
+[exfil_domains]
+# Add custom exfiltration domains to detect
+# add = ["evil-webhook.example.com", "my-internal-proxy.corp"]
+
+# Remove built-in domains (e.g., if you legitimately use them)
+# remove = ["ngrok.io", "localhost.run"]
+
+add = []
+remove = []
+
+[secrets]
+# Add custom secret patterns (regex)
+# add = [
+#     "MY_INTERNAL_TOKEN_[A-Za-z0-9]{32}",
+#     "CORP_API_KEY_[0-9]{20}",
+# ]
+
+# Remove built-in patterns you don't want to detect
+# Use the exact regex string from the defaults below
+# remove = [
+#     "eyJ[A-Za-z0-9_-]{10,}\\.eyJ[A-Za-z0-9_-]{10,}\\.[A-Za-z0-9_-]+",  # JWT
+# ]
+
+add = []
+remove = []
+
+# =============================================================================
+# Built-in Defaults (for reference - do not uncomment, these are compiled in)
+# =============================================================================
+#
+# Sensitive Paths:
+#   .env, .envrc                          (path_segment)
+#   .bashrc, .zshrc, .profile             (path_segment)
+#   .bash_profile, .bash_history          (path_segment)
+#   .zsh_history                          (path_segment)
+#   .ssh, known_hosts, authorized_keys    (path_segment)
+#   /id_rsa, /id_ed25519, /id_dsa         (suffix)
+#   /id_ecdsa                             (suffix)
+#   .aws, .azure, .config/gcloud          (path_segment)
+#   .kube, .docker                        (path_segment)
+#   .gnupg, .pgp                          (path_segment)
+#   .npmrc, .yarnrc, .pypirc              (path_segment)
+#   .gem, .cargo/credentials              (path_segment)
+#   .cargo/credentials.toml, .nuget       (path_segment)
+#   .git-credentials, .gitconfig          (path_segment)
+#   .netrc, .curlrc, .wgetrc              (path_segment)
+#   /etc/passwd, /etc/shadow              (substring)
+#   /etc/sudoers, /etc/hosts              (substring)
+#   .pgpass, .my.cnf, .mongoshrc.js       (path_segment)
+#   .travis.yml, .circleci                (path_segment)
+#   .github/secrets                       (substring)
+#   keychain, .keychain                   (path_segment)
+#
+# Exfil Domains:
+#   webhook.site, requestbin.com, requestcatcher.com
+#   hookbin.com, beeceptor.com, mockbin.org
+#   postb.in, ptsv2.com, putsreq.com
+#   ngrok.io, ngrok-free.app, ngrok.app
+#   localtunnel.me, serveo.net, localhost.run
+#   tunnelto.dev, loca.lt, telebit.cloud
+#   burpcollaborator.net, oastify.com, interact.sh
+#   canarytokens.com, dnslog.cn, ceye.io
+#   pastebin.com, paste.ee, hastebin.com
+#   dpaste.org, ghostbin.com, rentry.co
+#   pipedream.com, pipedream.net, zapier.com, ifttt.com
+#   transfer.sh, file.io, 0x0.st, temp.sh, termbin.com
+#
+# Secret Patterns (regex):
+#   AKIA[0-9A-Z]{16}                         (AWS Access Key ID)
+#   gh[ps]_[A-Za-z0-9_]{36,}                 (GitHub PAT classic)
+#   github_pat_[A-Za-z0-9_]{82,}             (GitHub fine-grained PAT)
+#   glpat-[A-Za-z0-9\-_]{20,}                (GitLab PAT)
+#   xox[baprs]-[0-9a-zA-Z\-]{10,}            (Slack tokens)
+#   sk-proj-[A-Za-z0-9\-_]{40,}              (OpenAI key)
+#   sk-ant-[A-Za-z0-9\-_]{20,}               (Anthropic key)
+#   [rs]k_(test|live)_[A-Za-z0-9]{24,}       (Stripe key)
+#   AIza[0-9A-Za-z\-_]{35}                   (Google API key)
+#   -----BEGIN.*PRIVATE KEY-----             (Private key header)
+#   npm_[A-Za-z0-9]{36}                      (npm token)
+#   pypi-[A-Za-z0-9]{16,}                    (PyPI token)
+#   mongodb://..., postgres://...            (DB connection strings)
+#   ... and ~30 more (see crates/core/src/secrets.rs)
