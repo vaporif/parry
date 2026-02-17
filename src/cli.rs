@@ -26,6 +26,10 @@ pub struct Cli {
           value_parser = threshold_in_range)]
     pub threshold: f32,
 
+    /// Disable daemon communication (always scan inline)
+    #[arg(long, env = "PARRY_NO_DAEMON")]
+    pub no_daemon: bool,
+
     #[command(subcommand)]
     pub command: Option<Command>,
 }
@@ -36,4 +40,10 @@ pub enum Command {
     Scan,
     /// `PostToolUse` hook mode (JSON stdin → JSON stdout)
     Hook,
+    /// Run as a daemon with the ML model loaded in memory
+    Serve {
+        /// Idle timeout in seconds before the daemon shuts down
+        #[arg(long, default_value = "1800")]
+        idle_timeout: u64,
+    },
 }

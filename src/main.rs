@@ -2,10 +2,12 @@ mod cli;
 
 use clap::Parser;
 use parry_cli::config::Config;
+use parry_cli::daemon;
 use parry_cli::hook;
 use parry_cli::scan;
 use std::io::Read;
 use std::process::ExitCode;
+use std::time::Duration;
 
 fn main() -> ExitCode {
     // Fail-open: any panic exits clean
@@ -20,10 +22,12 @@ fn main() -> ExitCode {
     let config = Config {
         hf_token_path: cli.hf_token_path,
         threshold: cli.threshold,
+        no_daemon: cli.no_daemon,
     };
 
     match cli.command {
         Some(cli::Command::Hook) => run_hook(&config),
+        Some(cli::Command::Serve { idle_timeout }) => run_serve(&config, idle_timeout),
         Some(cli::Command::Scan) | None => run_scan(&config),
     }
 }
@@ -69,4 +73,18 @@ fn run_hook(config: &Config) -> ExitCode {
     }
 
     ExitCode::SUCCESS // hooks always exit clean
+}
+
+fn run_serve(config: &Config, idle_timeout: u64) -> ExitCode {
+    let daemon_config = daemon::server::DaemonConfig {
+        idle_timeout: Duration::from_secs(idle_timeout),
+    };
+
+    match daemon::server::run(config, &daemon_config) {
+        Ok(()) => ExitCode::SUCCESS,
+        Err(e) => {
+            eprintln!("daemon error: {e}");
+            ExitCode::FAILURE
+        }
+    }
 }

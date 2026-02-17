@@ -27,8 +27,16 @@ impl ScanResult {
 }
 
 /// Run all scans (unicode + substring + secrets + ML) on the given text.
+/// Tries the daemon first if available, falls back to inline scanning.
 #[must_use]
 pub fn scan_text(text: &str, config: &Config) -> ScanResult {
+    // Try daemon first (fail-open: None means use inline)
+    if !config.no_daemon {
+        if let Some(result) = crate::daemon::client::try_scan_full(text, config) {
+            return result;
+        }
+    }
+
     let fast = scan_text_fast(text);
     if !fast.is_clean() {
         return fast;
@@ -81,6 +89,7 @@ mod tests {
         Config {
             hf_token_path: PathBuf::from("/nonexistent"),
             threshold: 0.5,
+            no_daemon: true,
         }
     }
 

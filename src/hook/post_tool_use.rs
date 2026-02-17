@@ -42,6 +42,7 @@ pub fn process(input: &HookInput, config: &Config) -> Option<HookOutput> {
 
         return warning_for_result(&scan::scan_text_fast(response));
     } else if WEB_TOOLS.contains(&input.tool_name.as_str()) {
+        maybe_spawn_daemon(config);
         return warning_for_result(&scan::scan_text(response, config));
     }
 
@@ -53,6 +54,15 @@ fn warning_for_result(result: &scan::ScanResult) -> Option<HookOutput> {
         scan::ScanResult::Injection => Some(HookOutput::warning(INJECTION_WARNING)),
         scan::ScanResult::Secret => Some(HookOutput::warning(SECRET_WARNING)),
         scan::ScanResult::Clean => None,
+    }
+}
+
+fn maybe_spawn_daemon(config: &Config) {
+    if config.no_daemon {
+        return;
+    }
+    if !crate::daemon::client::is_daemon_running() {
+        crate::daemon::client::spawn_daemon(config);
     }
 }
 
@@ -70,6 +80,7 @@ mod tests {
         Config {
             hf_token_path: PathBuf::from("/nonexistent"),
             threshold: 0.5,
+            no_daemon: true,
         }
     }
 

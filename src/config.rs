@@ -3,6 +3,7 @@ use std::path::PathBuf;
 pub struct Config {
     pub hf_token_path: PathBuf,
     pub threshold: f32,
+    pub no_daemon: bool,
 }
 
 impl Config {
