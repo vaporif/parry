@@ -1,0 +1,29 @@
+[package]
+name = "parry-core"
+description = "Core scanning (unicode, substring, secrets, decode) - no ML, no async"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+repository.workspace = true
+
+[dependencies]
+eyre.workspace = true
+thiserror.workspace = true
+regex.workspace = true
+aho-corasick.workspace = true
+unicode-general-category.workspace = true
+unicode-normalization.workspace = true
+unicode_skeleton.workspace = true
+data-encoding.workspace = true
+percent-encoding.workspace = true
+html-escape.workspace = true
+tracing.workspace = true
+serde = { workspace = true, features = ["derive"] }
+toml.workspace = true
+dirs.workspace = true
+
+[dev-dependencies]
+tempfile.workspace = true
+
+[lints]
+workspace = true
