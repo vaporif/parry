@@ -16,7 +16,7 @@ impl MlScanner {
     /// Returns an error if the ONNX session or tokenizer cannot be loaded.
     pub fn new(model_path: &str, tokenizer_path: &str, threshold: f32) -> Result<Self> {
         let session = Session::builder()?.commit_from_file(model_path)?;
-        let tokenizer = Tokenizer::from_file(tokenizer_path)?;
+        let tokenizer = Tokenizer::from_file(tokenizer_path).map_err(|e| eyre::eyre!(e))?;
 
         Ok(Self {
             session,
@@ -27,7 +27,10 @@ impl MlScanner {
 
     /// Score a single text chunk. Returns probability of injection (label 1).
     fn score(&mut self, text: &str) -> Result<f32> {
-        let encoding = self.tokenizer.encode(text, true)?;
+        let encoding = self
+            .tokenizer
+            .encode(text, true)
+            .map_err(|e| eyre::eyre!(e))?;
 
         let ids: Vec<i64> = encoding.get_ids().iter().map(|&id| i64::from(id)).collect();
         let mask: Vec<i64> = encoding
@@ -35,10 +38,8 @@ impl MlScanner {
             .iter()
             .map(|&m| i64::from(m))
             .collect();
-        let len = ids.len();
-
-        #[allow(clippy::cast_possible_wrap)]
-        let shape = vec![1i64, len as i64];
+        let len = i64::try_from(ids.len())?;
+        let shape = vec![1i64, len];
         let input_ids = Tensor::from_array((shape.clone(), ids))?;
         let attention_mask = Tensor::from_array((shape, mask))?;
 
