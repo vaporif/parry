@@ -41,7 +41,7 @@ fn run_scan(config: &Config) -> i32 {
         return 0;
     }
 
-    if scan::scan_text(text, config).is_injection() {
+    if !scan::scan_text(text, config).is_clean() {
         1
     } else {
         0
