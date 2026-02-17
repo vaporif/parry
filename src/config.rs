@@ -6,6 +6,7 @@ pub struct Config {
 }
 
 impl Config {
+    #[must_use]
     pub fn hf_token(&self) -> Option<String> {
         std::fs::read_to_string(&self.hf_token_path)
             .ok()

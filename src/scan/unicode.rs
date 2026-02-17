@@ -3,6 +3,7 @@ use unicode_general_category::{get_general_category, GeneralCategory};
 /// Returns true if text contains suspicious invisible Unicode characters.
 /// Flags: private-use (Co), unassigned (Cn), or 3+ format (Cf) chars.
 /// A single leading BOM (U+FEFF) is excluded.
+#[must_use]
 pub fn has_invisible_unicode(text: &str) -> bool {
     let text = text.strip_prefix('\u{FEFF}').unwrap_or(text);
 
@@ -25,6 +26,7 @@ pub fn has_invisible_unicode(text: &str) -> bool {
 }
 
 /// Strip all invisible Unicode characters (Cf, Co, Cn) from text.
+#[must_use]
 pub fn strip_invisible(text: &str) -> String {
     text.chars()
         .filter(|&ch| {

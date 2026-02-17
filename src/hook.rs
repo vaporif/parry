@@ -24,6 +24,7 @@ pub struct HookSpecificOutput {
 }
 
 impl HookOutput {
+    #[must_use]
     pub fn warning(message: &str) -> Self {
         Self {
             hook_specific_output: HookSpecificOutput {

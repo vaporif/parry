@@ -4,8 +4,9 @@ const HEAD_TAIL_THRESHOLD: usize = 1024;
 const HEAD_TAIL_SIZE: usize = 512;
 
 /// Yields overlapping chunks of text for ML scanning.
-/// For short text (<= CHUNK_SIZE), yields a single chunk.
+/// For short text (<= `CHUNK_SIZE`), yields a single chunk.
 /// For long text, yields sliding windows + a head+tail chunk.
+#[must_use]
 pub fn chunks(text: &str) -> Vec<&str> {
     if text.len() <= CHUNK_SIZE {
         return vec![text];
@@ -29,6 +30,7 @@ pub fn chunks(text: &str) -> Vec<&str> {
 
 /// Returns a head+tail slice pair for texts longer than 1024 chars.
 /// Catches injection appended at the very end.
+#[must_use]
 pub fn head_tail(text: &str) -> Option<(String, bool)> {
     if text.len() <= HEAD_TAIL_THRESHOLD {
         return None;

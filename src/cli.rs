@@ -13,7 +13,7 @@ fn threshold_in_range(s: &str) -> Result<f32, String> {
 #[derive(Parser)]
 #[command(name = "parry", about = "Prompt injection scanner")]
 pub struct Cli {
-    /// Path to HuggingFace token file
+    /// Path to `HuggingFace` token file
     #[arg(
         long,
         env = "CLAUDE_GUARD_HF_TOKEN_PATH",
@@ -34,6 +34,6 @@ pub struct Cli {
 pub enum Command {
     /// Read stdin text, exit 1 if injection detected, 0 if clean
     Scan,
-    /// PostToolUse hook mode (JSON stdin → JSON stdout)
+    /// `PostToolUse` hook mode (JSON stdin → JSON stdout)
     Hook,
 }

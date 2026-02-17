@@ -23,3 +23,7 @@ ort = { version = "2.0.0-rc.11", features = ["ndarray", "load-dynamic"] }
 tokenizers = { version = "0.22", default-features = false, features = ["fancy-regex"] }
 hf-hub = { version = "0.4", features = ["ureq", "rustls-tls"] }
 ndarray = "0.17"
+
+[lints.clippy]
+nursery = { level = "deny", priority = -1 }
+pedantic = { level = "deny", priority = -1 }

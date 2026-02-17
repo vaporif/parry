@@ -11,6 +11,9 @@ pub struct MlScanner {
 }
 
 impl MlScanner {
+    /// # Errors
+    ///
+    /// Returns an error if the ONNX session or tokenizer cannot be loaded.
     pub fn new(model_path: &str, tokenizer_path: &str, threshold: f32) -> Result<Self> {
         let session = Session::builder()?.commit_from_file(model_path)?;
         let tokenizer = Tokenizer::from_file(tokenizer_path)?;
@@ -26,14 +29,15 @@ impl MlScanner {
     fn score(&mut self, text: &str) -> Result<f32> {
         let encoding = self.tokenizer.encode(text, true)?;
 
-        let ids: Vec<i64> = encoding.get_ids().iter().map(|&id| id as i64).collect();
+        let ids: Vec<i64> = encoding.get_ids().iter().map(|&id| i64::from(id)).collect();
         let mask: Vec<i64> = encoding
             .get_attention_mask()
             .iter()
-            .map(|&m| m as i64)
+            .map(|&m| i64::from(m))
             .collect();
         let len = ids.len();
 
+        #[allow(clippy::cast_possible_wrap)]
         let shape = vec![1i64, len as i64];
         let input_ids = Tensor::from_array((shape.clone(), ids))?;
         let attention_mask = Tensor::from_array((shape, mask))?;
@@ -47,6 +51,10 @@ impl MlScanner {
     }
 
     /// Scan text using chunked strategy. Returns true if injection detected.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if scoring any chunk fails.
     pub fn scan_chunked(&mut self, text: &str) -> Result<bool> {
         use crate::scan::chunker;
 
@@ -70,7 +78,7 @@ fn softmax_injection_prob(logits: &[f32]) -> f32 {
     if logits.len() < 2 {
         return 0.0;
     }
-    let max = logits.iter().cloned().fold(f32::NEG_INFINITY, f32::max);
+    let max = logits.iter().copied().fold(f32::NEG_INFINITY, f32::max);
     let exps: Vec<f32> = logits.iter().map(|&l| (l - max).exp()).collect();
     let sum: f32 = exps.iter().sum();
     exps[1] / sum // label 1 = INJECTION

@@ -15,16 +15,19 @@ pub enum ScanResult {
 }
 
 impl ScanResult {
-    pub fn is_injection(&self) -> bool {
-        matches!(self, ScanResult::Injection)
+    #[must_use]
+    pub const fn is_injection(&self) -> bool {
+        matches!(self, Self::Injection)
     }
 
-    pub fn is_clean(&self) -> bool {
-        matches!(self, ScanResult::Clean)
+    #[must_use]
+    pub const fn is_clean(&self) -> bool {
+        matches!(self, Self::Clean)
     }
 }
 
 /// Run all scans (unicode + substring + secrets + ML) on the given text.
+#[must_use]
 pub fn scan_text(text: &str, config: &Config) -> ScanResult {
     let fast = scan_text_fast(text);
     if !fast.is_clean() {
@@ -35,7 +38,7 @@ pub fn scan_text(text: &str, config: &Config) -> ScanResult {
     let ml_result = std::panic::catch_unwind(std::panic::AssertUnwindSafe(|| {
         try_ml_scan(&unicode::strip_invisible(text), config)
     }));
-    if let Ok(Ok(true)) = ml_result {
+    if matches!(ml_result, Ok(Ok(true))) {
         return ScanResult::Injection;
     }
 
@@ -43,6 +46,7 @@ pub fn scan_text(text: &str, config: &Config) -> ScanResult {
 }
 
 /// Fast scan using unicode + substring + secrets (no ML). Used for local file reads in hook mode.
+#[must_use]
 pub fn scan_text_fast(text: &str) -> ScanResult {
     if unicode::has_invisible_unicode(text) {
         return ScanResult::Injection;

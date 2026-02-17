@@ -10,6 +10,12 @@ pub struct ModelPaths {
     pub tokenizer: String,
 }
 
+/// Download or locate the ONNX model and tokenizer files.
+///
+/// # Errors
+///
+/// Returns an error if the `HuggingFace` API client cannot be built or
+/// model/tokenizer files cannot be downloaded.
 pub fn ensure_model(config: &Config) -> Result<ModelPaths> {
     use hf_hub::api::sync::ApiBuilder;
 

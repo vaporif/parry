@@ -18,7 +18,7 @@ pub enum Error {
 
 impl From<Box<dyn std::error::Error + Send + Sync>> for Error {
     fn from(e: Box<dyn std::error::Error + Send + Sync>) -> Self {
-        Error::Tokenizer(e)
+        Self::Tokenizer(e)
     }
 }
 

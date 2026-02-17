@@ -23,7 +23,8 @@ const READ_TOOLS: &[&str] = &[
 /// Tools that fetch web content — always scanned.
 const WEB_TOOLS: &[&str] = &["WebFetch"];
 
-/// Process a PostToolUse hook event. Returns Some(HookOutput) if a threat is detected.
+/// Process a `PostToolUse` hook event. Returns `Some(HookOutput)` if a threat is detected.
+#[must_use]
 pub fn process(input: &HookInput, config: &Config) -> Option<HookOutput> {
     let response = input.tool_response.as_deref().filter(|s| !s.is_empty())?;
 
@@ -39,15 +40,15 @@ pub fn process(input: &HookInput, config: &Config) -> Option<HookOutput> {
             return None;
         }
 
-        return warning_for_result(scan::scan_text_fast(response));
+        return warning_for_result(&scan::scan_text_fast(response));
     } else if WEB_TOOLS.contains(&input.tool_name.as_str()) {
-        return warning_for_result(scan::scan_text(response, config));
+        return warning_for_result(&scan::scan_text(response, config));
     }
 
     None
 }
 
-fn warning_for_result(result: scan::ScanResult) -> Option<HookOutput> {
+fn warning_for_result(result: &scan::ScanResult) -> Option<HookOutput> {
     match result {
         scan::ScanResult::Injection => Some(HookOutput::warning(INJECTION_WARNING)),
         scan::ScanResult::Secret => Some(HookOutput::warning(SECRET_WARNING)),
