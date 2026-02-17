@@ -6,7 +6,7 @@ static INJECTION_PATTERNS: LazyLock<RegexSet> = LazyLock::new(|| {
         r"(?i)ignore\s+(all\s+)?previous\s+instructions",
         r"(?i)you\s+are\s+now",
         r"(?i)disregard\s+(all\s+)?(above|previous)",
-        r"(?i)^SYSTEM:\s",
+        r"(?im)^SYSTEM:\s",
         r"(?i)</?system-prompt>",
         r"(?i)</?system>\s*you",
         r"(?i)override\s+(all\s+)?safety\s+(check|guard|filter|protocol|restriction|setting|rule)",
@@ -52,6 +52,8 @@ mod tests {
         assert!(has_injection("<system-prompt>"));
         assert!(has_injection("</system-prompt>"));
         assert!(has_injection("<system> you are"));
+        // Multiline: SYSTEM: not at start of input
+        assert!(has_injection("Some preamble\nSYSTEM: you are now"));
     }
 
     #[test]

@@ -16,12 +16,12 @@ pub fn chunks(text: &str) -> Vec<&str> {
 
     let mut start = 0;
     while start < text.len() {
-        let end = (start + CHUNK_SIZE).min(text.len());
+        let end = text.floor_char_boundary((start + CHUNK_SIZE).min(text.len()));
         let chunk = &text[start..end];
         if !chunk.trim().is_empty() {
             result.push(chunk);
         }
-        start += step;
+        start = text.floor_char_boundary(start + step);
     }
 
     result
@@ -33,8 +33,9 @@ pub fn head_tail(text: &str) -> Option<(String, bool)> {
     if text.len() <= HEAD_TAIL_THRESHOLD {
         return None;
     }
-    let head = &text[..HEAD_TAIL_SIZE.min(text.len())];
-    let tail_start = text.len().saturating_sub(HEAD_TAIL_SIZE);
+    let head_end = text.floor_char_boundary(HEAD_TAIL_SIZE.min(text.len()));
+    let head = &text[..head_end];
+    let tail_start = text.floor_char_boundary(text.len().saturating_sub(HEAD_TAIL_SIZE));
     let tail = &text[tail_start..];
     Some((format!("{head} {tail}"), true))
 }
@@ -85,5 +86,37 @@ mod tests {
         let (combined, _) = result.unwrap();
         // head(512) + " " + tail(512) = 1025
         assert_eq!(combined.len(), 1025);
+    }
+
+    #[test]
+    fn chunks_multibyte_at_boundary() {
+        // 'ñ' is 2 bytes; place it so a chunk boundary falls inside it
+        let text = "a".repeat(255) + "ñ" + &"b".repeat(100);
+        let c = chunks(&text);
+        for chunk in &c {
+            // Every chunk must be valid UTF-8 (implicit via &str, but
+            // floor_char_boundary is what prevents the panic)
+            assert!(!chunk.is_empty());
+        }
+    }
+
+    #[test]
+    fn chunks_emoji_at_boundary() {
+        // '🔥' is 4 bytes
+        let text = "a".repeat(254) + "🔥" + &"b".repeat(100);
+        let c = chunks(&text);
+        for chunk in &c {
+            assert!(!chunk.is_empty());
+        }
+    }
+
+    #[test]
+    fn head_tail_with_multibyte() {
+        // Place multi-byte chars around the 512-byte head/tail cut points
+        let text = "a".repeat(511) + "ñ" + &"b".repeat(1000) + "🔥" + &"c".repeat(100);
+        let result = head_tail(&text);
+        assert!(result.is_some());
+        let (combined, _) = result.unwrap();
+        assert!(!combined.is_empty());
     }
 }

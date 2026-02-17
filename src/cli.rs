@@ -1,6 +1,15 @@
 use clap::{Parser, Subcommand};
 use std::path::PathBuf;
 
+fn threshold_in_range(s: &str) -> Result<f32, String> {
+    let val: f32 = s.parse().map_err(|e| format!("{e}"))?;
+    if (0.0..=1.0).contains(&val) {
+        Ok(val)
+    } else {
+        Err(format!("threshold must be between 0.0 and 1.0, got {val}"))
+    }
+}
+
 #[derive(Parser)]
 #[command(name = "parry", about = "Prompt injection scanner")]
 pub struct Cli {
@@ -13,7 +22,8 @@ pub struct Cli {
     pub hf_token_path: PathBuf,
 
     /// ML detection threshold (0.0–1.0)
-    #[arg(long, env = "CLAUDE_GUARD_THRESHOLD", default_value = "0.5")]
+    #[arg(long, env = "CLAUDE_GUARD_THRESHOLD", default_value = "0.5",
+          value_parser = threshold_in_range)]
     pub threshold: f32,
 
     /// Disable ML scanning (regex + unicode only)
