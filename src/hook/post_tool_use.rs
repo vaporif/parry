@@ -20,8 +20,8 @@ const READ_TOOLS: &[&str] = &[
     "mcp__filesystem__read_text_file",
 ];
 
-/// Tools that fetch web content — always scanned.
-const WEB_TOOLS: &[&str] = &["WebFetch"];
+/// Tools that fetch web content — always scanned with full ML pipeline.
+const WEB_TOOLS: &[&str] = &["WebFetch", "WebSearch"];
 
 /// Process a `PostToolUse` hook event. Returns `Some(HookOutput)` if a threat is detected.
 #[must_use]
@@ -49,7 +49,7 @@ pub fn process(input: &HookInput, config: &Config) -> Option<HookOutput> {
     };
 
     if result.is_injection() {
-        crate::taint::mark();
+        crate::taint::mark(&input.tool_name, input.session_id.as_deref());
     }
 
     warning_for_result(&result)
