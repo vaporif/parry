@@ -15,6 +15,35 @@ pub fn mark(session_id: &str) {
     let _ = std::fs::create_dir_all(&dir);
     let path = dir.join(hash_id(session_id));
     let _ = std::fs::write(&path, b"");
+    cleanup_expired(&dir);
+}
+
+/// Remove expired taint files. Runs on ~1 in 16 calls to avoid overhead.
+fn cleanup_expired(dir: &std::path::Path) {
+    // Use low bits of current time as cheap randomness
+    let now = SystemTime::now()
+        .duration_since(SystemTime::UNIX_EPOCH)
+        .unwrap_or(Duration::ZERO);
+    if now.as_nanos() & 0xF != 0 {
+        return;
+    }
+
+    let Ok(entries) = std::fs::read_dir(dir) else {
+        return;
+    };
+    for entry in entries.flatten() {
+        let Ok(meta) = entry.metadata() else {
+            continue;
+        };
+        let age = meta
+            .modified()
+            .ok()
+            .and_then(|m| SystemTime::now().duration_since(m).ok())
+            .unwrap_or(Duration::ZERO);
+        if age > TAINT_TTL {
+            let _ = std::fs::remove_file(entry.path());
+        }
+    }
 }
 
 /// Check if a session is tainted (and not expired).

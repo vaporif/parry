@@ -55,9 +55,31 @@ pub fn scan_text(text: &str, config: &Config) -> ScanResult {
     ScanResult::Clean
 }
 
-/// Fast scan using unicode + substring + secrets (no ML). Used for local file reads in hook mode.
+/// Fast scan using unicode + substring + secrets (no ML).
 #[must_use]
 pub fn scan_text_fast(text: &str) -> ScanResult {
+    let injection = scan_injection_only(text);
+    if !injection.is_clean() {
+        return injection;
+    }
+
+    let stripped = unicode::strip_invisible(text);
+    if secrets::has_secret(&stripped) {
+        return ScanResult::Secret;
+    }
+
+    for variant in decode::decode_variants(&stripped) {
+        if secrets::has_secret(&variant) {
+            return ScanResult::Secret;
+        }
+    }
+
+    ScanResult::Clean
+}
+
+/// Scan for injection only (unicode + substring + decoded variants). No secret detection.
+#[must_use]
+pub fn scan_injection_only(text: &str) -> ScanResult {
     if unicode::has_invisible_unicode(text) {
         return ScanResult::Injection;
     }
@@ -67,17 +89,9 @@ pub fn scan_text_fast(text: &str) -> ScanResult {
         return ScanResult::Injection;
     }
 
-    if secrets::has_secret(&stripped) {
-        return ScanResult::Secret;
-    }
-
-    // Scan normalized + decoded variants
     for variant in decode::decode_variants(&stripped) {
         if substring::has_security_substring(&variant) {
             return ScanResult::Injection;
-        }
-        if secrets::has_secret(&variant) {
-            return ScanResult::Secret;
         }
     }
 

