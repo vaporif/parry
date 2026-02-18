@@ -46,6 +46,10 @@ default = ["onnx"]
 onnx = ["dep:ort", "dep:ndarray"]
 candle = ["dep:candle-core", "dep:candle-nn", "dep:candle-transformers"]
 
+[dev-dependencies]
+filetime = "0.2"
+tempfile = "3"
+
 [lints.clippy]
 nursery = { level = "deny", priority = -1 }
 pedantic = { level = "deny", priority = -1 }
