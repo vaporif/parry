@@ -3,10 +3,7 @@ use std::path::PathBuf;
 const TAINT_FILE: &str = ".parry-tainted";
 
 fn taint_file() -> Option<PathBuf> {
-    if let Ok(dir) = std::env::var("PARRY_RUNTIME_DIR") {
-        return Some(PathBuf::from(dir).join(TAINT_FILE));
-    }
-    std::env::current_dir().ok().map(|d| d.join(TAINT_FILE))
+    crate::runtime_path(TAINT_FILE)
 }
 
 /// Mark the current project as tainted with context about what triggered it. Fail-silent.

@@ -13,6 +13,12 @@ pub fn process(input: &HookInput) -> Option<PreToolUseOutput> {
         return Some(PreToolUseOutput::deny(&reason));
     }
 
+    // Check CLAUDE.md files for prompt injection
+    if let Some(reason) = crate::guard::check_claude_md() {
+        crate::taint::mark("CLAUDE.md", input.session_id.as_deref());
+        return Some(PreToolUseOutput::deny(&reason));
+    }
+
     // Check Bash commands for exfiltration patterns
     if input.tool_name == "Bash" {
         if let Some(command) = input.tool_input.get("command").and_then(|v| v.as_str()) {
