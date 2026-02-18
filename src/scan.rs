@@ -32,7 +32,7 @@ impl ScanResult {
 /// Tries the daemon first if available, falls back to inline scanning.
 #[must_use]
 pub fn scan_text(text: &str, config: &Config) -> ScanResult {
-    // Try daemon first (fail-open: None means use inline)
+    // Try daemon first (None = fallback to inline scanning)
     if !config.no_daemon {
         if let Some(result) = crate::daemon::client::try_scan_full(text, config) {
             return result;
@@ -44,12 +44,20 @@ pub fn scan_text(text: &str, config: &Config) -> ScanResult {
         return fast;
     }
 
-    // fail-open: ML panics (e.g. missing ONNX dylib) and errors don't block
-    let ml_result = std::panic::catch_unwind(std::panic::AssertUnwindSafe(|| {
-        try_ml_scan(&unicode::strip_invisible(text), config)
-    }));
-    if matches!(ml_result, Ok(Ok(true))) {
-        return ScanResult::Injection;
+    // Only run ML when a backend is compiled in.
+    // fail-closed: ML panics or errors → treat as injection
+    if ml_backend_available() {
+        let ml_result = std::panic::catch_unwind(std::panic::AssertUnwindSafe(|| {
+            try_ml_scan(&unicode::strip_invisible(text), config)
+        }));
+        match ml_result {
+            Ok(Ok(true)) => return ScanResult::Injection,
+            Ok(Ok(false)) => {}
+            Ok(Err(_)) | Err(_) => {
+                eprintln!("parry: ML scan failed, treating as suspicious (fail-closed)");
+                return ScanResult::Injection;
+            }
+        }
     }
 
     ScanResult::Clean
@@ -95,6 +103,10 @@ fn scan_injection_only(text: &str) -> ScanResult {
     }
 
     ScanResult::Clean
+}
+
+const fn ml_backend_available() -> bool {
+    cfg!(any(feature = "onnx", feature = "candle"))
 }
 
 fn try_ml_scan(text: &str, config: &Config) -> Result<bool> {

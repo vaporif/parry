@@ -17,7 +17,9 @@ pub fn mark(tool_name: &str, session_id: Option<&str>) {
     if let Some(sid) = session_id {
         let _ = write!(context, "\nsession: {sid}");
     }
-    let _ = std::fs::write(&path, context);
+    if let Err(e) = std::fs::write(&path, context) {
+        eprintln!("parry: failed to write taint file {}: {e}", path.display());
+    }
 }
 
 /// Check if the current project is tainted.

@@ -104,8 +104,9 @@ fn handle_request(
 
             if let Some(scanner) = ml_scanner {
                 let stripped = scan::unicode::strip_invisible(&req.text);
-                if matches!(scanner.scan_chunked(&stripped), Ok(true)) {
-                    return ScanResponse::Injection;
+                match scanner.scan_chunked(&stripped) {
+                    Ok(false) => {}
+                    Ok(true) | Err(_) => return ScanResponse::Injection,
                 }
             }
 

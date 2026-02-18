@@ -10,11 +10,11 @@ use std::process::ExitCode;
 use std::time::Duration;
 
 fn main() -> ExitCode {
-    // Fail-open: any panic exits clean
+    // Fail-closed: any panic exits with failure
     let default_hook = std::panic::take_hook();
     std::panic::set_hook(Box::new(move |info| {
         default_hook(info);
-        std::process::exit(0);
+        std::process::exit(1);
     }));
 
     let cli = cli::Cli::parse();
@@ -36,7 +36,8 @@ fn main() -> ExitCode {
 fn run_scan(config: &Config) -> ExitCode {
     let mut text = String::new();
     if std::io::stdin().read_to_string(&mut text).is_err() {
-        return ExitCode::SUCCESS; // fail-open
+        eprintln!("parry: failed to read stdin (fail-closed)");
+        return ExitCode::FAILURE;
     }
 
     let text = text.trim();
@@ -54,7 +55,8 @@ fn run_scan(config: &Config) -> ExitCode {
 fn run_hook(config: &Config) -> ExitCode {
     let mut input = String::new();
     if std::io::stdin().read_to_string(&mut input).is_err() {
-        return ExitCode::SUCCESS; // fail-open
+        eprintln!("parry: failed to read stdin (fail-closed)");
+        return ExitCode::FAILURE;
     }
 
     let input = input.trim();
@@ -64,19 +66,24 @@ fn run_hook(config: &Config) -> ExitCode {
 
     let hook_input: hook::HookInput = match serde_json::from_str(input) {
         Ok(v) => v,
-        Err(_) => return ExitCode::SUCCESS, // fail-open on bad JSON
+        Err(e) => {
+            eprintln!("parry: invalid hook JSON: {e} (fail-closed)");
+            return ExitCode::FAILURE;
+        }
     };
 
     // Auto-detect: tool_response present → PostToolUse, absent → PreToolUse
     if hook_input.tool_response.is_some() {
         if let Some(output) = hook::post_tool_use::process(&hook_input, config) {
-            if let Ok(json) = serde_json::to_string(&output) {
-                println!("{json}");
+            match serde_json::to_string(&output) {
+                Ok(json) => println!("{json}"),
+                Err(e) => eprintln!("parry: failed to serialize hook output: {e}"),
             }
         }
     } else if let Some(output) = hook::pre_tool_use::process(&hook_input) {
-        if let Ok(json) = serde_json::to_string(&output) {
-            println!("{json}");
+        match serde_json::to_string(&output) {
+            Ok(json) => println!("{json}"),
+            Err(e) => eprintln!("parry: failed to serialize hook output: {e}"),
         }
     }
 
