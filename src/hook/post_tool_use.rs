@@ -50,11 +50,8 @@ pub fn process(input: &HookInput, config: &Config) -> Option<HookOutput> {
         return None;
     };
 
-    // Mark session tainted on injection (not secrets — those aren't prompt injection attacks)
-    if matches!(result, scan::ScanResult::Injection) {
-        if let Some(sid) = &input.session_id {
-            crate::taint::mark(sid);
-        }
+    if result.is_injection() {
+        crate::taint::mark();
     }
 
     warning_for_result(&result)

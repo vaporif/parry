@@ -66,7 +66,7 @@ pub fn detect_exfiltration(command: &str) -> Option<String> {
 }
 
 /// Returns `Some(reason)` if the command contains any network sink command.
-/// Used in tainted sessions where ANY outbound network command is suspicious.
+/// Used in tainted projects where ANY outbound network command is suspicious.
 #[must_use]
 pub fn has_network_sink(command: &str) -> Option<String> {
     let tree = parse_bash(command)?;
