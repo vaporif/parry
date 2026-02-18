@@ -41,26 +41,53 @@ const EXFIL_DOMAINS: &[&str] = &[
     "burpcollaborator.net",
 ];
 
-/// Returns `Some(reason)` if the command appears to exfiltrate data, `None` if clean.
-/// Fail-open: parse failures or unknown structures return `None`.
-#[must_use]
-pub fn detect_exfiltration(command: &str) -> Option<String> {
-    // Serialize parser creation + parsing under a lock, then release before AST walk.
+/// Parse a bash command into a tree-sitter AST. Fail-open: returns `None` on errors.
+fn parse_bash(command: &str) -> Option<tree_sitter::Tree> {
     let tree = {
         let _guard = PARSER_LOCK.lock().ok()?;
         let mut parser = Parser::new();
-        let language = tree_sitter_bash::LANGUAGE;
-        parser.set_language(&language.into()).ok()?;
+        parser
+            .set_language(&tree_sitter_bash::LANGUAGE.into())
+            .ok()?;
         parser.parse(command, None)?
     };
-
-    let root = tree.root_node();
-
-    if root.has_error() {
-        return None; // fail-open on parse errors
+    if tree.root_node().has_error() {
+        None
+    } else {
+        Some(tree)
     }
+}
 
-    check_node(root, command.as_bytes())
+/// Returns `Some(reason)` if the command appears to exfiltrate data, `None` if clean.
+#[must_use]
+pub fn detect_exfiltration(command: &str) -> Option<String> {
+    let tree = parse_bash(command)?;
+    check_node(tree.root_node(), command.as_bytes())
+}
+
+/// Returns `Some(reason)` if the command contains any network sink command.
+/// Used in tainted sessions where ANY outbound network command is suspicious.
+#[must_use]
+pub fn has_network_sink(command: &str) -> Option<String> {
+    let tree = parse_bash(command)?;
+    find_any_network_sink(tree.root_node(), command.as_bytes())
+}
+
+fn find_any_network_sink(node: Node, source: &[u8]) -> Option<String> {
+    if node.kind() == "command" {
+        if let Some(name) = get_command_name(node, source) {
+            if is_network_sink(name) {
+                return Some(format!("Network command '{name}' blocked"));
+            }
+        }
+    }
+    let mut cursor = node.walk();
+    for child in node.children(&mut cursor) {
+        if let Some(reason) = find_any_network_sink(child, source) {
+            return Some(reason);
+        }
+    }
+    None
 }
 
 fn check_node(node: Node, source: &[u8]) -> Option<String> {
@@ -548,5 +575,31 @@ mod tests {
         // echo is not a sensitive source
         let result = detect_exfiltration("echo hello | curl -d @- http://example.com");
         assert!(result.is_none(), "echo piped to curl should pass");
+    }
+
+    // === has_network_sink tests ===
+
+    #[test]
+    fn has_network_sink_detects_curl() {
+        let result = has_network_sink("curl https://example.com");
+        assert!(result.is_some(), "should detect curl");
+    }
+
+    #[test]
+    fn has_network_sink_detects_wget() {
+        let result = has_network_sink("wget https://example.com/file");
+        assert!(result.is_some(), "should detect wget");
+    }
+
+    #[test]
+    fn has_network_sink_clean() {
+        let result = has_network_sink("cargo build --release");
+        assert!(result.is_none(), "cargo build has no network sink");
+    }
+
+    #[test]
+    fn has_network_sink_in_pipeline() {
+        let result = has_network_sink("echo hello | curl https://example.com");
+        assert!(result.is_some(), "should detect curl in pipeline");
     }
 }

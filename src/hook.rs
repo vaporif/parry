@@ -8,6 +8,7 @@ pub struct HookInput {
     pub tool_name: String,
     pub tool_input: serde_json::Value,
     pub tool_response: Option<String>,
+    pub session_id: Option<String>,
 }
 
 #[derive(Debug, Serialize)]
