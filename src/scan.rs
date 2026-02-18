@@ -57,7 +57,7 @@ pub fn scan_text(text: &str, config: &Config) -> ScanResult {
 
 /// Fast scan using unicode + substring + secrets (no ML).
 #[must_use]
-pub fn scan_text_fast(text: &str) -> ScanResult {
+pub(crate) fn scan_text_fast(text: &str) -> ScanResult {
     let injection = scan_injection_only(text);
     if !injection.is_clean() {
         return injection;
@@ -78,8 +78,7 @@ pub fn scan_text_fast(text: &str) -> ScanResult {
 }
 
 /// Scan for injection only (unicode + substring + decoded variants). No secret detection.
-#[must_use]
-pub fn scan_injection_only(text: &str) -> ScanResult {
+fn scan_injection_only(text: &str) -> ScanResult {
     if unicode::has_invisible_unicode(text) {
         return ScanResult::Injection;
     }
