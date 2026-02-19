@@ -30,6 +30,15 @@ tree-sitter-python = "0.25"
 tree-sitter-javascript = "0.25"
 tree-sitter-ruby = "0.23"
 tree-sitter-php = "0.24"
+# tree-sitter-perl requires 0.26, skipped
+tree-sitter-lua = "0.4"
+tree-sitter-powershell = "0.25"
+# tree-sitter-r requires 0.26, checking...
+tree-sitter-elixir = "0.3"
+tree-sitter-julia = "0.23"
+tree-sitter-groovy = "0.1"
+tree-sitter-scala = "0.24"
+tree-sitter-kotlin-ng = "1.1"
 
 bytes = "1"
 futures-util = { version = "0.3", default-features = false, features = ["sink"] }

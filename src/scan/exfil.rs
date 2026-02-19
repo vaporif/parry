@@ -2,18 +2,32 @@ use std::sync::Mutex;
 
 use tree_sitter::{Node, Parser};
 
+mod elixir;
+mod groovy;
 mod javascript;
+mod julia;
+mod kotlin;
 mod lang;
+mod lua;
 mod php;
+mod powershell;
 mod python;
 mod ruby;
+mod scala;
 
 use lang::detect_exfil_in_code;
 
+use self::elixir::ElixirDetector;
+use self::groovy::GroovyDetector;
 use self::javascript::JavaScriptDetector;
+use self::julia::JuliaDetector;
+use self::kotlin::KotlinDetector;
+use self::lua::LuaDetector;
 use self::php::PhpDetector;
+use self::powershell::PowerShellDetector;
 use self::python::PythonDetector;
 use self::ruby::RubyDetector;
+use self::scala::ScalaDetector;
 
 /// Mutex to serialize tree-sitter parser creation (C runtime is not thread-safe during init).
 static PARSER_LOCK: Mutex<()> = Mutex::new(());
@@ -669,14 +683,33 @@ fn try_ast_detection(code: &str, cmd_name: &str) -> Option<String> {
         .to_lowercase();
 
     match base.as_str() {
+        // Python
         "python" | "python2" | "python3" | "pypy" | "pypy3" => {
             detect_exfil_in_code(code, &PythonDetector, cmd_name)
         }
+        // JavaScript/TypeScript
         "node" | "nodejs" | "deno" | "bun" => {
             detect_exfil_in_code(code, &JavaScriptDetector, cmd_name)
         }
+        // Ruby
         "ruby" | "jruby" => detect_exfil_in_code(code, &RubyDetector, cmd_name),
+        // PHP
         "php" | "php-cgi" => detect_exfil_in_code(code, &PhpDetector, cmd_name),
+        // Perl - no AST (tree-sitter-perl requires 0.26), keyword fallback
+        // Lua
+        "lua" => detect_exfil_in_code(code, &LuaDetector, cmd_name),
+        // PowerShell
+        "pwsh" | "powershell" => detect_exfil_in_code(code, &PowerShellDetector, cmd_name),
+        // R - no AST (tree-sitter-r requires 0.26), keyword fallback
+        // Elixir
+        "elixir" => detect_exfil_in_code(code, &ElixirDetector, cmd_name),
+        // Julia
+        "julia" => detect_exfil_in_code(code, &JuliaDetector, cmd_name),
+        // JVM scripting
+        "groovy" => detect_exfil_in_code(code, &GroovyDetector, cmd_name),
+        "scala" => detect_exfil_in_code(code, &ScalaDetector, cmd_name),
+        "kotlin" | "kotlinc" => detect_exfil_in_code(code, &KotlinDetector, cmd_name),
+        // No AST support: jshell, tclsh, wish, osascript - fall through to keyword matching
         _ => None,
     }
 }
