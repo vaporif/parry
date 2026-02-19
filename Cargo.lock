@@ -1787,7 +1787,6 @@ dependencies = [
 name = "parry-exfil"
 version = "0.1.0"
 dependencies = [
- "parry-core",
  "regex",
  "tree-sitter",
  "tree-sitter-bash",

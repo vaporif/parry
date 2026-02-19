@@ -33,12 +33,16 @@ fn home_dir() -> Option<PathBuf> {
     }
 }
 
+fn socket_path() -> io::Result<PathBuf> {
+    Ok(parry_dir()?.join("parry.sock"))
+}
+
 fn socket_name() -> io::Result<interprocess::local_socket::Name<'static>> {
     // Always use filesystem path for reliable cleanup across all platforms.
     // Namespaced sockets (Linux abstract, Windows named pipes) can leave stale
     // references that are difficult to clean up, causing "Address already in use".
-    let path = parry_dir()?.join("parry.sock");
-    path.to_fs_name::<GenericFilePath>()
+    socket_path()?
+        .to_fs_name::<GenericFilePath>()
         .map_err(|e| io::Error::new(io::ErrorKind::InvalidInput, e))
 }
 
@@ -61,7 +65,7 @@ pub fn bind_async() -> io::Result<interprocess::local_socket::tokio::Listener> {
     std::fs::create_dir_all(&dir)?;
 
     // Remove stale socket file before binding
-    let sock_path = dir.join("parry.sock");
+    let sock_path = socket_path()?;
     if sock_path.exists() {
         let _ = std::fs::remove_file(&sock_path);
     }

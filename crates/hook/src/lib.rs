@@ -89,36 +89,20 @@ pub fn scan_text(text: &str, config: &Config) -> ScanResult {
         return fast;
     }
 
-    // Only run ML when a backend is compiled in.
-    // fail-closed: ML panics or errors → treat as injection
-    if ml_backend_available() {
-        let ml_result = std::panic::catch_unwind(std::panic::AssertUnwindSafe(|| {
-            try_ml_scan(&parry_core::unicode::strip_invisible(text), config)
-        }));
-        match ml_result {
-            Ok(Ok(true)) => return ScanResult::Injection,
-            Ok(Ok(false)) => {}
-            Ok(Err(_)) | Err(_) => {
-                eprintln!("parry: ML scan failed, treating as suspicious (fail-closed)");
-                return ScanResult::Injection;
-            }
+    // ML scan with fail-closed: panics or errors → treat as injection
+    let stripped = parry_core::unicode::strip_invisible(text);
+    let ml_result = std::panic::catch_unwind(std::panic::AssertUnwindSafe(|| {
+        parry_ml::MlScanner::load(config).and_then(|mut s| s.scan_chunked(&stripped))
+    }));
+
+    match ml_result {
+        Ok(Ok(false)) => ScanResult::Clean,
+        Ok(Ok(true)) => ScanResult::Injection,
+        Ok(Err(_)) | Err(_) => {
+            eprintln!("parry: ML scan failed, treating as suspicious (fail-closed)");
+            ScanResult::Injection
         }
     }
-
-    ScanResult::Clean
-}
-
-const fn ml_backend_available() -> bool {
-    cfg!(any(
-        feature = "onnx",
-        feature = "onnx-fetch",
-        feature = "candle"
-    ))
-}
-
-fn try_ml_scan(text: &str, config: &Config) -> parry_core::Result<bool> {
-    let mut scanner = parry_ml::MlScanner::load(config)?;
-    scanner.scan_chunked(text)
 }
 
 #[cfg(test)]
