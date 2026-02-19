@@ -96,6 +96,7 @@ fn run_serve(config: &Config, idle_timeout: u64) -> ExitCode {
     };
 
     let rt = match tokio::runtime::Builder::new_current_thread()
+        .enable_io()
         .enable_time()
         .build()
     {
