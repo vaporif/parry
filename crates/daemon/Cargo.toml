@@ -1,0 +1,27 @@
+[package]
+name = "parry-daemon"
+description = "Async daemon for persistent ML model loading"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+repository.workspace = true
+
+[dependencies]
+parry-core.workspace = true
+parry-ml.workspace = true
+eyre.workspace = true
+bytes.workspace = true
+futures-util.workspace = true
+interprocess.workspace = true
+tokio.workspace = true
+tokio-util.workspace = true
+
+[features]
+default = ["candle"]
+onnx = ["parry-ml/onnx"]
+onnx-fetch = ["parry-ml/onnx-fetch"]
+onnx-coreml = ["parry-ml/onnx-coreml"]
+candle = ["parry-ml/candle"]
+
+[lints]
+workspace = true

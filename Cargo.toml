@@ -1,19 +1,23 @@
-[package]
-name = "parry-cli"
+[workspace]
+members = ["crates/*"]
+resolver = "2"
+
+[workspace.package]
 version = "0.1.0"
 edition = "2021"
-description = "Prompt injection scanner — substring, unicode, secrets, and ML detection"
 license = "MIT"
 repository = "https://github.com/vaporif/parry"
 
-[[bin]]
-name = "parry"
-path = "src/main.rs"
+[workspace.dependencies]
+# Internal crates
+parry-core = { path = "crates/core" }
+parry-ml = { path = "crates/ml" }
+parry-exfil = { path = "crates/exfil" }
+parry-daemon = { path = "crates/daemon" }
+parry-hook = { path = "crates/hook" }
 
-[dependencies]
-clap = { version = "4", features = ["derive", "env"] }
-serde = { version = "1", features = ["derive"] }
-serde_json = "1"
+# Core dependencies
+eyre = "0.6"
 regex = "1"
 aho-corasick = "1"
 unicode-general-category = "1"
@@ -22,18 +26,23 @@ unicode_skeleton = "0.1"
 data-encoding = "2"
 percent-encoding = "2"
 html-escape = "0.2"
-eyre = "0.6"
-redb = "2"
+
+# Serialization
+serde = { version = "1", features = ["derive"] }
+serde_json = "1"
+
+# CLI
+clap = { version = "4", features = ["derive", "env"] }
+
+# Tree-sitter (exfil)
 tree-sitter = "0.26"
 tree-sitter-bash = "0.25"
 tree-sitter-python = "0.25"
 tree-sitter-javascript = "0.25"
 tree-sitter-ruby = "0.23"
 tree-sitter-php = "0.24"
-# tree-sitter-perl requires 0.26, skipped
 tree-sitter-lua = "0.4"
 tree-sitter-powershell = "0.25"
-# tree-sitter-r requires 0.26, checking...
 tree-sitter-elixir = "0.3"
 tree-sitter-julia = "0.23"
 tree-sitter-groovy = "0.1"
@@ -43,35 +52,32 @@ tree-sitter-perl = "1.1"
 tree-sitter-r = "1.2"
 tree-sitter-nix = "0.3"
 
+# ML dependencies
+tokenizers = { version = "0.22", default-features = false, features = ["fancy-regex"] }
+hf-hub = { version = "0.4", features = ["ureq", "rustls-tls"] }
+
+# ONNX backend (optional)
+ort = { version = "2.0.0-rc.11", default-features = false, features = ["std", "ndarray"] }
+ndarray = "0.17"
+
+# Candle backend (optional)
+candle-core = "0.9"
+candle-nn = "0.9"
+candle-transformers = "0.9"
+
+# Daemon/async
 bytes = "1"
 futures-util = { version = "0.3", default-features = false, features = ["sink"] }
 interprocess = { version = "2", features = ["tokio"] }
 tokio = { version = "1", features = ["rt", "macros", "time"] }
 tokio-util = { version = "0.7", features = ["codec"] }
-tokenizers = { version = "0.22", default-features = false, features = ["fancy-regex"] }
-hf-hub = { version = "0.4", features = ["ureq", "rustls-tls"] }
 
-# ML backends (optional)
-ort = { version = "2.0.0-rc.11", default-features = false, features = ["std", "ndarray"], optional = true }
-ndarray = { version = "0.17", optional = true }
-candle-core = { version = "0.9", optional = true }
-candle-nn = { version = "0.9", optional = true }
-candle-transformers = { version = "0.9", optional = true }
+# Hook/storage
+redb = "2"
 
-[features]
-default = ["candle"]
-# ONNX with runtime dylib loading (user provides ORT_DYLIB_PATH)
-onnx = ["dep:ort", "dep:ndarray", "ort/load-dynamic"]
-# ONNX with auto-download of runtime (self-contained, larger binary)
-onnx-fetch = ["dep:ort", "dep:ndarray", "ort/download-binaries", "ort/copy-dylibs", "ort/tls-native"]
-# ONNX with CoreML acceleration (Apple Silicon)
-onnx-coreml = ["onnx-fetch", "ort/coreml"]
-# Pure Rust ML backend (no native deps, slower)
-candle = ["dep:candle-core", "dep:candle-nn", "dep:candle-transformers"]
-
-[dev-dependencies]
+# Dev dependencies
 tempfile = "3"
 
-[lints.clippy]
+[workspace.lints.clippy]
 nursery = { level = "deny", priority = -1 }
 pedantic = { level = "deny", priority = -1 }

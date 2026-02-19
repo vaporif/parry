@@ -1739,32 +1739,56 @@ dependencies = [
 ]
 
 [[package]]
-name = "parry-cli"
+name = "parry"
+version = "0.1.0"
+dependencies = [
+ "clap",
+ "parry-core",
+ "parry-daemon",
+ "parry-exfil",
+ "parry-hook",
+ "parry-ml",
+ "serde_json",
+ "tokio",
+]
+
+[[package]]
+name = "parry-core"
 version = "0.1.0"
 dependencies = [
  "aho-corasick",
- "bytes",
- "candle-core",
- "candle-nn",
- "candle-transformers",
  "clap",
  "data-encoding",
  "eyre",
- "futures-util",
- "hf-hub",
  "html-escape",
- "interprocess",
- "ndarray",
- "ort",
  "percent-encoding",
- "redb",
  "regex",
- "serde",
- "serde_json",
  "tempfile",
- "tokenizers",
+ "unicode-general-category",
+ "unicode-normalization",
+ "unicode_skeleton",
+]
+
+[[package]]
+name = "parry-daemon"
+version = "0.1.0"
+dependencies = [
+ "bytes",
+ "eyre",
+ "futures-util",
+ "interprocess",
+ "parry-core",
+ "parry-ml",
  "tokio",
  "tokio-util",
+]
+
+[[package]]
+name = "parry-exfil"
+version = "0.1.0"
+dependencies = [
+ "parry-core",
+ "regex",
  "tree-sitter",
  "tree-sitter-bash",
  "tree-sitter-elixir",
@@ -1781,9 +1805,38 @@ dependencies = [
  "tree-sitter-r",
  "tree-sitter-ruby",
  "tree-sitter-scala",
- "unicode-general-category",
- "unicode-normalization",
- "unicode_skeleton",
+]
+
+[[package]]
+name = "parry-hook"
+version = "0.1.0"
+dependencies = [
+ "eyre",
+ "parry-core",
+ "parry-daemon",
+ "parry-exfil",
+ "parry-ml",
+ "redb",
+ "serde",
+ "serde_json",
+ "tempfile",
+]
+
+[[package]]
+name = "parry-ml"
+version = "0.1.0"
+dependencies = [
+ "candle-core",
+ "candle-nn",
+ "candle-transformers",
+ "eyre",
+ "hf-hub",
+ "ndarray",
+ "ort",
+ "parry-core",
+ "serde",
+ "serde_json",
+ "tokenizers",
 ]
 
 [[package]]

@@ -1,0 +1,30 @@
+[package]
+name = "parry-hook"
+description = "Claude Code hook integration"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+repository.workspace = true
+
+[dependencies]
+parry-core.workspace = true
+parry-ml.workspace = true
+parry-exfil.workspace = true
+parry-daemon.workspace = true
+eyre.workspace = true
+serde.workspace = true
+serde_json.workspace = true
+redb.workspace = true
+
+[features]
+default = ["candle"]
+onnx = ["parry-ml/onnx", "parry-daemon/onnx"]
+onnx-fetch = ["parry-ml/onnx-fetch", "parry-daemon/onnx-fetch"]
+onnx-coreml = ["parry-ml/onnx-coreml", "parry-daemon/onnx-coreml"]
+candle = ["parry-ml/candle", "parry-daemon/candle"]
+
+[dev-dependencies]
+tempfile.workspace = true
+
+[lints]
+workspace = true
