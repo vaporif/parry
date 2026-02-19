@@ -1,8 +1,14 @@
+// Ensure at least one ML backend is enabled
+#[cfg(not(any(feature = "onnx", feature = "onnx-fetch", feature = "candle")))]
+compile_error!(
+    "At least one ML backend must be enabled: 'onnx', 'onnx-fetch' (default), or 'candle'"
+);
+
 pub mod backend;
 
 #[cfg(feature = "candle")]
 pub mod candle;
-#[cfg(feature = "onnx")]
+#[cfg(any(feature = "onnx", feature = "onnx-fetch"))]
 pub mod onnx;
 
 use crate::config::{Config, MlBackendKind};
@@ -82,14 +88,14 @@ fn load_auto_backend(repo: &hf_hub::api::sync::ApiRepo) -> Result<Box<dyn MlBack
     #[cfg(feature = "candle")]
     return load_candle_backend(repo);
 
-    #[cfg(all(feature = "onnx", not(feature = "candle")))]
+    #[cfg(all(any(feature = "onnx", feature = "onnx-fetch"), not(feature = "candle")))]
     return load_onnx_backend(repo);
 
-    #[cfg(not(any(feature = "onnx", feature = "candle")))]
+    #[cfg(not(any(feature = "onnx", feature = "onnx-fetch", feature = "candle")))]
     return Err(eyre::eyre!("no ML backend compiled in"));
 }
 
-#[cfg(feature = "onnx")]
+#[cfg(any(feature = "onnx", feature = "onnx-fetch"))]
 fn load_onnx_backend(repo: &hf_hub::api::sync::ApiRepo) -> Result<Box<dyn MlBackend>> {
     let model_path = repo
         .get("onnx/model.onnx")
@@ -99,10 +105,10 @@ fn load_onnx_backend(repo: &hf_hub::api::sync::ApiRepo) -> Result<Box<dyn MlBack
     )?))
 }
 
-#[cfg(not(feature = "onnx"))]
+#[cfg(not(any(feature = "onnx", feature = "onnx-fetch")))]
 fn load_onnx_backend(_repo: &hf_hub::api::sync::ApiRepo) -> Result<Box<dyn MlBackend>> {
     Err(eyre::eyre!(
-        "onnx backend not compiled in (enable 'onnx' feature)"
+        "onnx backend not compiled in (enable 'onnx' or 'onnx-fetch' feature)"
     ))
 }
 
@@ -127,7 +133,7 @@ fn load_candle_backend(_repo: &hf_hub::api::sync::ApiRepo) -> Result<Box<dyn MlB
     ))
 }
 
-#[cfg(any(feature = "onnx", feature = "candle", test))]
+#[cfg(any(feature = "onnx", feature = "onnx-fetch", feature = "candle", test))]
 pub(crate) fn softmax_injection_prob(logits: &[f32]) -> f32 {
     if logits.len() < 2 {
         return 0.0;

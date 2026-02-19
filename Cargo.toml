@@ -52,15 +52,21 @@ tokenizers = { version = "0.22", default-features = false, features = ["fancy-re
 hf-hub = { version = "0.4", features = ["ureq", "rustls-tls"] }
 
 # ML backends (optional)
-ort = { version = "2.0.0-rc.11", features = ["ndarray", "load-dynamic"], optional = true }
+ort = { version = "2.0.0-rc.11", default-features = false, features = ["std", "ndarray"], optional = true }
 ndarray = { version = "0.17", optional = true }
 candle-core = { version = "0.9", optional = true }
 candle-nn = { version = "0.9", optional = true }
 candle-transformers = { version = "0.9", optional = true }
 
 [features]
-default = ["onnx"]
-onnx = ["dep:ort", "dep:ndarray"]
+default = ["candle"]
+# ONNX with runtime dylib loading (user provides ORT_DYLIB_PATH)
+onnx = ["dep:ort", "dep:ndarray", "ort/load-dynamic"]
+# ONNX with auto-download of runtime (self-contained, larger binary)
+onnx-fetch = ["dep:ort", "dep:ndarray", "ort/download-binaries", "ort/copy-dylibs", "ort/tls-native"]
+# ONNX with CoreML acceleration (Apple Silicon)
+onnx-coreml = ["onnx-fetch", "ort/coreml"]
+# Pure Rust ML backend (no native deps, slower)
 candle = ["dep:candle-core", "dep:candle-nn", "dep:candle-transformers"]
 
 [dev-dependencies]

@@ -106,7 +106,11 @@ fn scan_injection_only(text: &str) -> ScanResult {
 }
 
 const fn ml_backend_available() -> bool {
-    cfg!(any(feature = "onnx", feature = "candle"))
+    cfg!(any(
+        feature = "onnx",
+        feature = "onnx-fetch",
+        feature = "candle"
+    ))
 }
 
 fn try_ml_scan(text: &str, config: &Config) -> Result<bool> {

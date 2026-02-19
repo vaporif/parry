@@ -11,7 +11,14 @@ impl OnnxBackend {
     ///
     /// Returns an error if the ONNX session cannot be loaded.
     pub fn load(model_path: &str) -> Result<Self> {
-        let session = Session::builder()?.commit_from_file(model_path)?;
+        let builder = Session::builder()?;
+
+        #[cfg(feature = "onnx-coreml")]
+        let builder = builder.with_execution_providers([
+            ort::execution_providers::CoreMLExecutionProvider::default().build(),
+        ])?;
+
+        let session = builder.commit_from_file(model_path)?;
         Ok(Self { session })
     }
 }
