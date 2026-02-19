@@ -9,9 +9,11 @@ mod julia;
 mod kotlin;
 mod lang;
 mod lua;
+mod perl;
 mod php;
 mod powershell;
 mod python;
+mod r;
 mod ruby;
 mod scala;
 
@@ -23,9 +25,11 @@ use self::javascript::JavaScriptDetector;
 use self::julia::JuliaDetector;
 use self::kotlin::KotlinDetector;
 use self::lua::LuaDetector;
+use self::perl::PerlDetector;
 use self::php::PhpDetector;
 use self::powershell::PowerShellDetector;
 use self::python::PythonDetector;
+use self::r::RDetector;
 use self::ruby::RubyDetector;
 use self::scala::ScalaDetector;
 
@@ -695,12 +699,14 @@ fn try_ast_detection(code: &str, cmd_name: &str) -> Option<String> {
         "ruby" | "jruby" => detect_exfil_in_code(code, &RubyDetector, cmd_name),
         // PHP
         "php" | "php-cgi" => detect_exfil_in_code(code, &PhpDetector, cmd_name),
-        // Perl - no AST (tree-sitter-perl requires 0.26), keyword fallback
+        // Perl
+        "perl" => detect_exfil_in_code(code, &PerlDetector, cmd_name),
         // Lua
         "lua" => detect_exfil_in_code(code, &LuaDetector, cmd_name),
         // PowerShell
         "pwsh" | "powershell" => detect_exfil_in_code(code, &PowerShellDetector, cmd_name),
-        // R - no AST (tree-sitter-r requires 0.26), keyword fallback
+        // R
+        "r" | "rscript" => detect_exfil_in_code(code, &RDetector, cmd_name),
         // Elixir
         "elixir" => detect_exfil_in_code(code, &ElixirDetector, cmd_name),
         // Julia
