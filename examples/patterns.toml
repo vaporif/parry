@@ -34,6 +34,22 @@ remove = []
 add = []
 remove = []
 
+[secrets]
+# Add custom secret patterns (regex)
+# add = [
+#     "MY_INTERNAL_TOKEN_[A-Za-z0-9]{32}",
+#     "CORP_API_KEY_[0-9]{20}",
+# ]
+
+# Remove built-in patterns you don't want to detect
+# Use the exact regex string from the defaults below
+# remove = [
+#     "eyJ[A-Za-z0-9_-]{10,}\\.eyJ[A-Za-z0-9_-]{10,}\\.[A-Za-z0-9_-]+",  # JWT
+# ]
+
+add = []
+remove = []
+
 # =============================================================================
 # Built-in Defaults (for reference - do not uncomment, these are compiled in)
 # =============================================================================
@@ -74,3 +90,19 @@ remove = []
 #   dpaste.org, ghostbin.com, rentry.co
 #   pipedream.com, pipedream.net, zapier.com, ifttt.com
 #   transfer.sh, file.io, 0x0.st, temp.sh, termbin.com
+#
+# Secret Patterns (regex):
+#   AKIA[0-9A-Z]{16}                         (AWS Access Key ID)
+#   gh[ps]_[A-Za-z0-9_]{36,}                 (GitHub PAT classic)
+#   github_pat_[A-Za-z0-9_]{82,}             (GitHub fine-grained PAT)
+#   glpat-[A-Za-z0-9\-_]{20,}                (GitLab PAT)
+#   xox[baprs]-[0-9a-zA-Z\-]{10,}            (Slack tokens)
+#   sk-proj-[A-Za-z0-9\-_]{40,}              (OpenAI key)
+#   sk-ant-[A-Za-z0-9\-_]{20,}               (Anthropic key)
+#   [rs]k_(test|live)_[A-Za-z0-9]{24,}       (Stripe key)
+#   AIza[0-9A-Za-z\-_]{35}                   (Google API key)
+#   -----BEGIN.*PRIVATE KEY-----             (Private key header)
+#   npm_[A-Za-z0-9]{36}                      (npm token)
+#   pypi-[A-Za-z0-9]{16,}                    (PyPI token)
+#   mongodb://..., postgres://...            (DB connection strings)
+#   ... and ~30 more (see crates/core/src/secrets.rs)
