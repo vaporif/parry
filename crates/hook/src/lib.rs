@@ -144,6 +144,42 @@ pub fn scan_text(text: &str, config: &Config) -> ScanResult {
     }
 }
 
+/// Shared test utilities for tests that manipulate global state (cwd, env vars).
+#[cfg(test)]
+pub(crate) mod test_util {
+    use std::path::{Path, PathBuf};
+    use std::sync::MutexGuard;
+
+    /// Single mutex shared across all test modules that touch cwd/env.
+    static ENV_MUTEX: std::sync::Mutex<()> = std::sync::Mutex::new(());
+
+    /// RAII guard that serializes env access and restores cwd on drop.
+    pub(crate) struct EnvGuard<'a> {
+        prev_cwd: PathBuf,
+        _lock: MutexGuard<'a, ()>,
+    }
+
+    impl<'a> EnvGuard<'a> {
+        pub(crate) fn new(dir: &Path) -> Self {
+            let lock = ENV_MUTEX.lock().unwrap_or_else(|e| e.into_inner());
+            let prev_cwd = std::env::current_dir().unwrap();
+            unsafe { std::env::set_var("PARRY_RUNTIME_DIR", dir) };
+            std::env::set_current_dir(dir).unwrap();
+            Self {
+                prev_cwd,
+                _lock: lock,
+            }
+        }
+    }
+
+    impl Drop for EnvGuard<'_> {
+        fn drop(&mut self) {
+            let _ = std::env::set_current_dir(&self.prev_cwd);
+            unsafe { std::env::remove_var("PARRY_RUNTIME_DIR") };
+        }
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;

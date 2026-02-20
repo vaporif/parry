@@ -145,7 +145,7 @@ impl CompiledSecrets {
         Self::from_config(&config.secrets)
     }
 
-    /// Create from explicit config (useful for testing).
+    /// Create from an explicit config.
     #[must_use]
     #[allow(clippy::missing_panics_doc)] // Panic only if hardcoded defaults are invalid
     pub fn from_config(config: &SecretConfig) -> Self {

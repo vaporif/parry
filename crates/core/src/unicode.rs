@@ -60,13 +60,7 @@ static HOMOGLYPHS: LazyLock<HashMap<char, char>> = LazyLock::new(|| {
 /// Returns true if text contains homoglyph characters (non-Latin lookalikes).
 #[must_use]
 pub fn has_homoglyphs(text: &str) -> bool {
-    for ch in text.chars() {
-        if HOMOGLYPHS.contains_key(&ch) {
-            trace!(char = ?ch, "homoglyph detected");
-            return true;
-        }
-    }
-    false
+    text.chars().any(|ch| HOMOGLYPHS.contains_key(&ch))
 }
 
 /// Normalize homoglyphs to their Latin equivalents. RTL overrides are stripped.

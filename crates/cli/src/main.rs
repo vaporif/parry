@@ -156,7 +156,7 @@ fn run_diff(config: &Config, git_ref: &str, extensions: Option<&str>, full: bool
     }
 
     let ext_filter: Option<Vec<&str>> = extensions.map(|e| e.split(',').map(str::trim).collect());
-    let mut detected = Vec::new();
+    let mut detected: Vec<(&str, parry_core::ScanResult)> = Vec::new();
     let mut scanned = 0;
 
     for file in &files {
@@ -189,7 +189,7 @@ fn run_diff(config: &Config, git_ref: &str, extensions: Option<&str>, full: bool
 
         if !result.is_clean() {
             info!(file, ?result, "threat detected");
-            detected.push((file.to_string(), result));
+            detected.push((file, result));
         }
     }
 
