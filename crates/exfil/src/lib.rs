@@ -24,6 +24,7 @@ mod kotlin;
 pub mod lang;
 mod lua;
 mod nix;
+pub mod patterns;
 mod perl;
 mod php;
 mod powershell;
@@ -171,122 +172,6 @@ const DNS_EXFIL_TOOLS: &[&str] = &[
 const SENSITIVE_SOURCES: &[&str] = &[
     "cat", "head", "tail", "less", "more", "env", "printenv", "whoami", "id", "hostname", "aws",
     "gcloud", "az", "pass", "gpg", "security", "kubectl",
-];
-
-pub(crate) const SENSITIVE_PATHS: &[&str] = &[
-    // Environment and config
-    ".env",
-    ".envrc",
-    ".bashrc",
-    ".zshrc",
-    ".profile",
-    ".bash_profile",
-    ".bash_history",
-    ".zsh_history",
-    // SSH
-    ".ssh/",
-    "id_rsa",
-    "id_ed25519",
-    "id_dsa",
-    "id_ecdsa",
-    "known_hosts",
-    "authorized_keys",
-    // Cloud credentials
-    ".aws/",
-    ".azure/",
-    ".config/gcloud/",
-    ".kube/config",
-    ".docker/config.json",
-    // GPG/PGP
-    ".gnupg/",
-    ".pgp/",
-    // Package managers
-    ".npmrc",
-    ".yarnrc",
-    ".pypirc",
-    ".gem/credentials",
-    ".cargo/credentials",
-    ".nuget/",
-    // Git
-    ".git-credentials",
-    ".gitconfig",
-    // Network auth
-    ".netrc",
-    ".curlrc",
-    ".wgetrc",
-    // System files
-    "/etc/passwd",
-    "/etc/shadow",
-    "/etc/sudoers",
-    "/etc/hosts",
-    // Generic sensitive names
-    "credentials",
-    "secrets",
-    ".token",
-    "secret_key",
-    "private_key",
-    "api_key",
-    "access_token",
-    "refresh_token",
-    // Database
-    ".pgpass",
-    ".my.cnf",
-    ".mongoshrc.js",
-    // CI/CD
-    ".travis.yml",
-    ".circleci/",
-    ".github/secrets",
-    // macOS
-    "keychain",
-    ".keychain/",
-];
-
-pub(crate) const EXFIL_DOMAINS: &[&str] = &[
-    // Webhook/request catchers
-    "webhook.site",
-    "requestbin.com",
-    "requestcatcher.com",
-    "hookbin.com",
-    "beeceptor.com",
-    "mockbin.org",
-    "postb.in",
-    "ptsv2.com",
-    "putsreq.com",
-    // Tunneling services
-    "ngrok.io",
-    "ngrok-free.app",
-    "ngrok.app",
-    "localtunnel.me",
-    "serveo.net",
-    "localhost.run",
-    "tunnelto.dev",
-    "loca.lt",
-    "telebit.cloud",
-    // Pentesting/security tools
-    "burpcollaborator.net",
-    "oastify.com",
-    "interact.sh",
-    "canarytokens.com",
-    "dnslog.cn",
-    "ceye.io",
-    // Pastebin services
-    "pastebin.com",
-    "paste.ee",
-    "hastebin.com",
-    "dpaste.org",
-    "ghostbin.com",
-    "rentry.co",
-    // Pipelines/automation
-    "pipedream.com",
-    "pipedream.net",
-    "zapier.com",
-    "ifttt.com",
-    // File sharing (potential exfil)
-    "transfer.sh",
-    "file.io",
-    "0x0.st",
-    "temp.sh",
-    "termbin.com",
 ];
 
 const INTERPRETERS: &[&str] = &[
@@ -596,36 +481,24 @@ fn check_obfuscation_patterns(command: &str) -> Option<String> {
 
 /// Check if command contains sensitive data being piped or used
 fn has_sensitive_context_in_command(command: &str) -> bool {
-    // Check if a sensitive source is piped to or used with the sink
-    let lower = command.to_lowercase();
-
-    // Check for sensitive paths
-    for path in SENSITIVE_PATHS {
-        if lower.contains(path) {
-            return true;
-        }
+    // Check for sensitive paths using proper path-aware matching
+    if patterns::has_sensitive_path(command) {
+        return true;
     }
 
     // Check for sensitive commands
-    for src in SENSITIVE_SOURCES {
-        if lower.contains(src) {
-            return true;
-        }
-    }
-
-    false
+    let lower = command.to_lowercase();
+    SENSITIVE_SOURCES.iter().any(|src| lower.contains(src))
 }
 
 /// Check if command has suspicious context (sensitive files or network indicators).
 fn has_suspicious_context(command: &str) -> bool {
-    let lower = command.to_lowercase();
-
-    // Check for sensitive paths
-    for path in SENSITIVE_PATHS {
-        if lower.contains(path) {
-            return true;
-        }
+    // Check for sensitive paths using proper path-aware matching
+    if patterns::has_sensitive_path(command) {
+        return true;
     }
+
+    let lower = command.to_lowercase();
 
     // Check for network-related content
     if lower.contains("http://")
@@ -641,14 +514,8 @@ fn has_suspicious_context(command: &str) -> bool {
         return true;
     }
 
-    // Check for exfil domains
-    for domain in EXFIL_DOMAINS {
-        if lower.contains(domain) {
-            return true;
-        }
-    }
-
-    false
+    // Check for exfil domains using proper domain regex
+    patterns::has_exfil_domain(command)
 }
 
 /// Try to decode hex escape sequences like $'\x63\x75\x72\x6c'.
@@ -1097,8 +964,7 @@ fn command_has_sensitive_path(node: Node, source: &[u8]) -> bool {
 }
 
 pub(crate) fn has_sensitive_path(text: &str) -> bool {
-    let lower = text.to_lowercase();
-    SENSITIVE_PATHS.iter().any(|p| lower.contains(p))
+    patterns::has_sensitive_path(text)
 }
 
 fn has_suspicious_url(node: Node, source: &[u8]) -> bool {
@@ -1116,7 +982,7 @@ fn has_suspicious_url(node: Node, source: &[u8]) -> bool {
 }
 
 fn is_suspicious_url(text: &str) -> bool {
-    EXFIL_DOMAINS.iter().any(|d| text.contains(d)) || is_ip_url(text)
+    patterns::has_exfil_domain(text) || is_ip_url(text)
 }
 
 fn is_ip_url(text: &str) -> bool {
@@ -1353,8 +1219,8 @@ fn check_code_string_for_exfil(code: &str, cmd_name: &str) -> Option<String> {
         ));
     }
 
-    // Check for exfil domains in the code string
-    if EXFIL_DOMAINS.iter().any(|d| lower.contains(d)) {
+    // Check for exfil domains in the code string using proper domain regex
+    if patterns::has_exfil_domain(code) {
         return Some(format!(
             "Interpreter '{cmd_name}' inline code targeting exfil domain"
         ));

@@ -5,7 +5,7 @@
 
 use tree_sitter::{Language, Parser, Query, QueryCursor, StreamingIterator};
 
-use super::{has_sensitive_path, EXFIL_DOMAINS};
+use super::{has_sensitive_path, patterns};
 
 /// Trait for language-specific exfiltration detection.
 pub trait LangExfilDetector: Send + Sync {
@@ -91,8 +91,8 @@ pub fn detect_exfil_in_code<L: LangExfilDetector>(
                 let text = capture.node.utf8_text(source).unwrap_or("");
                 let lower = text.to_lowercase();
 
-                // Check for exfil domains
-                if EXFIL_DOMAINS.iter().any(|d| lower.contains(d)) {
+                // Check for exfil domains using proper domain regex
+                if patterns::has_exfil_domain(text) {
                     result.has_exfil_domain = true;
                 }
 

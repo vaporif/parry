@@ -8,6 +8,9 @@ repository.workspace = true
 
 [dependencies]
 regex.workspace = true
+serde = { workspace = true, features = ["derive"] }
+toml.workspace = true
+dirs.workspace = true
 tree-sitter.workspace = true
 tree-sitter-bash.workspace = true
 tree-sitter-python.workspace = true
