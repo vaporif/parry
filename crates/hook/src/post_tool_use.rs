@@ -16,7 +16,7 @@ const EXFIL_WARNING: &str =
 
 /// Process a `PostToolUse` hook event. Returns `Some(HookOutput)` if a threat is detected.
 #[must_use]
-#[instrument(skip(input, config), fields(tool = %input.tool_name, response_len = input.tool_response.as_ref().map_or(0, |s| s.len())))]
+#[instrument(skip(input, config), fields(tool = %input.tool_name, response_len = input.tool_response.as_ref().map_or(0, String::len)))]
 pub fn process(input: &HookInput, config: &Config) -> Option<HookOutput> {
     let response = input.tool_response.as_deref().filter(|s| !s.is_empty())?;
 
