@@ -12,6 +12,7 @@ serde = { workspace = true, features = ["derive"] }
 toml.workspace = true
 dirs.workspace = true
 tree-sitter.workspace = true
+tracing.workspace = true
 tree-sitter-bash.workspace = true
 tree-sitter-python.workspace = true
 tree-sitter-javascript.workspace = true

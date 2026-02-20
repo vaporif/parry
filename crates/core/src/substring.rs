@@ -1,5 +1,6 @@
 use aho_corasick::AhoCorasick;
 use std::sync::LazyLock;
+use tracing::debug;
 
 static SECURITY_SUBSTRINGS: LazyLock<AhoCorasick> = LazyLock::new(|| {
     AhoCorasick::builder()
@@ -65,7 +66,11 @@ static SECURITY_SUBSTRINGS: LazyLock<AhoCorasick> = LazyLock::new(|| {
 });
 
 pub fn has_security_substring(text: &str) -> bool {
-    SECURITY_SUBSTRINGS.is_match(text)
+    let matched = SECURITY_SUBSTRINGS.is_match(text);
+    if matched {
+        debug!("security substring matched");
+    }
+    matched
 }
 
 #[cfg(test)]

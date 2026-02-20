@@ -9,6 +9,7 @@ pub mod taint;
 
 use parry_core::{Config, ScanResult};
 use serde::{Deserialize, Serialize};
+use tracing::{debug, instrument, warn};
 
 #[derive(Debug, Deserialize)]
 pub struct HookInput {
@@ -76,16 +77,20 @@ impl PreToolUseOutput {
 /// Run all scans (unicode + substring + secrets + ML) on the given text.
 /// Tries the daemon first if available, falls back to inline scanning.
 #[must_use]
+#[instrument(skip(text, config), fields(text_len = text.len()))]
 pub fn scan_text(text: &str, config: &Config) -> ScanResult {
     // Try daemon first (None = fallback to inline scanning)
     if !config.no_daemon {
         if let Some(result) = parry_daemon::try_scan_full(text, config) {
+            debug!(?result, "scan complete via daemon");
             return result;
         }
+        debug!("daemon unavailable, falling back to inline scan");
     }
 
     let fast = parry_core::scan_text_fast(text);
     if !fast.is_clean() {
+        debug!(?fast, "fast scan detected issue");
         return fast;
     }
 
@@ -96,9 +101,21 @@ pub fn scan_text(text: &str, config: &Config) -> ScanResult {
     }));
 
     match ml_result {
-        Ok(Ok(false)) => ScanResult::Clean,
-        Ok(Ok(true)) => ScanResult::Injection,
-        Ok(Err(_)) | Err(_) => {
+        Ok(Ok(false)) => {
+            debug!("ML scan clean");
+            ScanResult::Clean
+        }
+        Ok(Ok(true)) => {
+            debug!("ML scan detected injection");
+            ScanResult::Injection
+        }
+        Ok(Err(e)) => {
+            warn!(%e, "ML scan failed, treating as suspicious (fail-closed)");
+            eprintln!("parry: ML scan failed, treating as suspicious (fail-closed)");
+            ScanResult::Injection
+        }
+        Err(_) => {
+            warn!("ML scan panicked, treating as suspicious (fail-closed)");
             eprintln!("parry: ML scan failed, treating as suspicious (fail-closed)");
             ScanResult::Injection
         }

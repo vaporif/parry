@@ -1,6 +1,7 @@
 //! `PostToolUse` hook processing.
 
 use parry_core::Config;
+use tracing::{debug, instrument};
 
 use crate::{scan_text, HookInput, HookOutput};
 
@@ -15,6 +16,7 @@ const EXFIL_WARNING: &str =
 
 /// Process a `PostToolUse` hook event. Returns `Some(HookOutput)` if a threat is detected.
 #[must_use]
+#[instrument(skip(input, config), fields(tool = %input.tool_name, response_len = input.tool_response.as_ref().map_or(0, |s| s.len())))]
 pub fn process(input: &HookInput, config: &Config) -> Option<HookOutput> {
     let response = input.tool_response.as_deref().filter(|s| !s.is_empty())?;
 
@@ -24,22 +26,27 @@ pub fn process(input: &HookInput, config: &Config) -> Option<HookOutput> {
     let result = scan_text(response, config);
 
     if result.is_injection() {
+        debug!("marking tool as tainted");
         crate::taint::mark(&input.tool_name, input.session_id.as_deref());
     }
 
     if let Some(warning) = warning_for_result(result) {
+        debug!("threat detected, returning warning");
         return Some(warning);
     }
 
     // Script exfiltration scan for file-reading tools
     if is_file_read_tool(&input.tool_name) {
         if let Some(file_path) = extract_file_path(&input.tool_input) {
-            if let Some(_reason) = parry_exfil::scan_file_content(&file_path, response) {
+            debug!(file_path = %file_path, "scanning for exfiltration patterns");
+            if let Some(reason) = parry_exfil::scan_file_content(&file_path, response) {
+                debug!(%reason, "exfiltration detected");
                 return Some(HookOutput::warning(EXFIL_WARNING));
             }
         }
     }
 
+    debug!("no threats detected");
     None
 }
 

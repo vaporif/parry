@@ -10,6 +10,8 @@ pub mod unicode;
 
 use std::path::PathBuf;
 
+use tracing::{debug, instrument, trace};
+
 pub use config::{Config, MlBackendKind};
 pub use error::Result;
 
@@ -35,44 +37,54 @@ impl ScanResult {
 
 /// Fast scan using unicode + substring + secrets (no ML).
 #[must_use]
+#[instrument(skip(text), fields(text_len = text.len()))]
 pub fn scan_text_fast(text: &str) -> ScanResult {
     let injection = scan_injection_only(text);
     if !injection.is_clean() {
+        debug!(?injection, "injection detected in fast scan");
         return injection;
     }
 
     let stripped = unicode::strip_invisible(text);
     if secrets::has_secret(&stripped) {
+        debug!("secret detected in stripped text");
         return ScanResult::Secret;
     }
 
     for variant in decode::decode_variants(&stripped) {
         if secrets::has_secret(&variant) {
+            trace!("secret detected in decoded variant");
             return ScanResult::Secret;
         }
     }
 
+    trace!("fast scan clean");
     ScanResult::Clean
 }
 
 /// Scan for injection only (unicode + substring + decoded variants). No secret detection.
 #[must_use]
+#[instrument(skip(text), fields(text_len = text.len()))]
 pub fn scan_injection_only(text: &str) -> ScanResult {
     if unicode::has_invisible_unicode(text) {
+        debug!("invisible unicode detected");
         return ScanResult::Injection;
     }
 
     let stripped = unicode::strip_invisible(text);
     if substring::has_security_substring(&stripped) {
+        debug!("security substring detected");
         return ScanResult::Injection;
     }
 
     for variant in decode::decode_variants(&stripped) {
         if substring::has_security_substring(&variant) {
+            trace!("security substring in decoded variant");
             return ScanResult::Injection;
         }
     }
 
+    trace!("injection scan clean");
     ScanResult::Clean
 }
 

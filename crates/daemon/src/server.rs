@@ -6,6 +6,7 @@ use futures_util::{SinkExt, StreamExt};
 use interprocess::local_socket::traits::tokio::Listener as _;
 use tokio::time::Instant;
 use tokio_util::codec::Framed;
+use tracing::{debug, info, instrument, warn};
 
 use parry_core::{Config, ScanResult};
 use parry_ml::MlScanner;
@@ -22,8 +23,10 @@ pub struct DaemonConfig {
 /// # Errors
 ///
 /// Returns an error if another daemon is running or the socket cannot be bound.
+#[instrument(skip(config, daemon_config), fields(idle_timeout = ?daemon_config.idle_timeout))]
 pub async fn run(config: &Config, daemon_config: &DaemonConfig) -> eyre::Result<()> {
     if crate::client::is_daemon_running() {
+        warn!("another daemon is already running");
         return Err(eyre::eyre!("another daemon is already running"));
     }
 
@@ -34,14 +37,16 @@ pub async fn run(config: &Config, daemon_config: &DaemonConfig) -> eyre::Result<
 
     let mut ml_scanner = load_ml_scanner(config);
 
+    let ml_status = if ml_scanner.is_some() {
+        "loaded"
+    } else {
+        "unavailable"
+    };
+    info!(pid = std::process::id(), ml = ml_status, "daemon started");
     eprintln!(
         "parry daemon started (pid={}, ml={})",
         std::process::id(),
-        if ml_scanner.is_some() {
-            "loaded"
-        } else {
-            "unavailable"
-        }
+        ml_status
     );
 
     let idle_timeout = daemon_config.idle_timeout;
@@ -52,13 +57,18 @@ pub async fn run(config: &Config, daemon_config: &DaemonConfig) -> eyre::Result<
             result = listener.accept() => {
                 match result {
                     Ok(stream) => {
+                        debug!("accepted connection");
                         handle_connection(stream, &mut ml_scanner).await;
                         deadline = Instant::now() + idle_timeout;
                     }
-                    Err(e) => eprintln!("accept error: {e}"),
+                    Err(e) => {
+                        warn!(%e, "accept error");
+                        eprintln!("accept error: {e}");
+                    }
                 }
             }
             () = tokio::time::sleep_until(deadline) => {
+                info!("idle timeout, shutting down");
                 eprintln!("parry daemon idle timeout, shutting down");
                 break;
             }
@@ -93,20 +103,35 @@ async fn handle_connection(
 }
 
 fn handle_request(req: &ScanRequest, ml_scanner: &mut Option<MlScanner>) -> ScanResponse {
+    debug!(scan_type = ?req.scan_type, text_len = req.text.len(), "handling request");
     match req.scan_type {
         ScanType::Ping => ScanResponse::Pong,
-        ScanType::Fast => scan_result_to_response(parry_core::scan_text_fast(&req.text)),
+        ScanType::Fast => {
+            let result = parry_core::scan_text_fast(&req.text);
+            debug!(?result, "fast scan complete");
+            scan_result_to_response(result)
+        }
         ScanType::Full => {
             let fast = parry_core::scan_text_fast(&req.text);
             if !fast.is_clean() {
+                debug!(?fast, "fast scan detected issue");
                 return scan_result_to_response(fast);
             }
 
             if let Some(scanner) = ml_scanner {
                 let stripped = parry_core::unicode::strip_invisible(&req.text);
                 match scanner.scan_chunked(&stripped) {
-                    Ok(false) => {}
-                    Ok(true) | Err(_) => return ScanResponse::Injection,
+                    Ok(false) => {
+                        debug!("ML scan clean");
+                    }
+                    Ok(true) => {
+                        debug!("ML scan detected injection");
+                        return ScanResponse::Injection;
+                    }
+                    Err(e) => {
+                        warn!(%e, "ML scan error, treating as injection (fail-closed)");
+                        return ScanResponse::Injection;
+                    }
                 }
             }
 

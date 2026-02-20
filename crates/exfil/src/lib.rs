@@ -4,6 +4,7 @@ use std::path::Path;
 use std::sync::{LazyLock, Mutex};
 
 use regex::Regex;
+use tracing::{debug, instrument, trace};
 use tree_sitter::{Node, Parser};
 
 /// Regex for detecting `xxd` as a command (word boundary).
@@ -74,11 +75,13 @@ static PARSER_LOCK: Mutex<()> = Mutex::new(());
 /// - Nix: `.nix`
 /// - Shell: `.sh`, `.bash`, `.zsh`, `.ksh`, `.fish`
 #[must_use]
+#[instrument(skip(content), fields(content_len = content.len()))]
 pub fn scan_file_content(filename: &str, content: &str) -> Option<String> {
     let ext = Path::new(filename)
         .extension()
         .and_then(|e| e.to_str())
         .map(str::to_lowercase)?;
+    debug!(ext = %ext, "scanning file for exfiltration");
 
     match ext.as_str() {
         // Python
@@ -599,14 +602,22 @@ fn is_suspicious_decoded(decoded: &str) -> bool {
 
 /// Returns `Some(reason)` if the command appears to exfiltrate data, `None` if clean.
 #[must_use]
+#[instrument(skip(command), fields(command_len = command.len()))]
 pub fn detect_exfiltration(command: &str) -> Option<String> {
     // First check for obfuscation patterns (these work on raw text)
     if let Some(reason) = check_obfuscation_patterns(command) {
+        debug!(%reason, "obfuscation pattern detected");
         return Some(reason);
     }
 
     let tree = parse_bash(command)?;
-    check_node(tree.root_node(), command.as_bytes())
+    let result = check_node(tree.root_node(), command.as_bytes());
+    if let Some(ref reason) = result {
+        debug!(%reason, "exfiltration detected");
+    } else {
+        trace!("no exfiltration detected");
+    }
+    result
 }
 
 fn check_node(node: Node, source: &[u8]) -> Option<String> {

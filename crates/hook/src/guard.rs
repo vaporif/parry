@@ -3,24 +3,30 @@
 use std::hash::{DefaultHasher, Hash, Hasher};
 use std::path::{Path, PathBuf};
 
+use tracing::{debug, instrument, warn};
+
 const GUARD_DB_FILE: &str = ".parry-guard.redb";
 const TABLE: redb::TableDefinition<&str, u64> = redb::TableDefinition::new("guard_cache");
 
 /// Check all CLAUDE.md files from cwd to filesystem root.
 /// Returns `Some(reason)` if injection is found, `None` if clean.
 #[must_use]
+#[instrument]
 pub fn check_claude_md() -> Option<String> {
     let paths = claude_md_paths();
     if paths.is_empty() {
+        debug!("no CLAUDE.md files found");
         return None;
     }
 
+    debug!(count = paths.len(), "checking CLAUDE.md files");
     let cache = GuardCache::open();
 
     for path in &paths {
         let content = match std::fs::read_to_string(path) {
             Ok(c) => c,
             Err(e) => {
+                warn!(path = %path.display(), %e, "cannot read CLAUDE.md (fail-closed)");
                 return Some(format!("Cannot read {} (fail-closed): {e}", path.display()));
             }
         };
@@ -29,20 +35,24 @@ pub fn check_claude_md() -> Option<String> {
 
         if let Some(ref c) = cache {
             if c.is_cached_clean(path, hash) {
+                debug!(path = %path.display(), "CLAUDE.md cached as clean");
                 continue;
             }
         }
 
         let result = parry_core::scan_text_fast(&content);
         if !result.is_clean() {
+            debug!(path = %path.display(), "injection detected in CLAUDE.md");
             return Some(format!("Prompt injection detected in {}", path.display()));
         }
 
         if let Some(ref c) = cache {
             c.mark_clean(path, hash);
+            debug!(path = %path.display(), "CLAUDE.md marked as clean in cache");
         }
     }
 
+    debug!("all CLAUDE.md files clean");
     None
 }
 
@@ -84,7 +94,7 @@ impl GuardCache {
         match redb::Database::create(&path) {
             Ok(db) => Some(Self { db }),
             Err(e) => {
-                eprintln!("parry: guard cache open failed (scanning without cache): {e}");
+                warn!(%e, "guard cache open failed (scanning without cache)");
                 None
             }
         }

@@ -3,6 +3,7 @@
 use std::time::Duration;
 
 use parry_core::{Config, ScanResult};
+use tracing::{debug, trace};
 
 use crate::protocol::{self, ScanRequest, ScanResponse, ScanType};
 use crate::transport::Stream;
@@ -13,17 +14,23 @@ const CONNECT_TIMEOUT: Duration = Duration::from_millis(50);
 /// Try a full scan (with ML) via the daemon. Returns `None` if daemon unavailable.
 #[must_use]
 pub fn try_scan_full(text: &str, config: &Config) -> Option<ScanResult> {
+    debug!(text_len = text.len(), "attempting full scan via daemon");
     let req = ScanRequest {
         scan_type: ScanType::Full,
         threshold: config.threshold,
         text: text.to_string(),
     };
-    send_request(&req)
+    let result = send_request(&req);
+    if result.is_none() {
+        debug!("daemon unavailable, will fallback to inline scan");
+    }
+    result
 }
 
 /// Try a fast scan (no ML) via the daemon. Returns `None` if daemon unavailable.
 #[must_use]
 pub fn try_scan_fast(text: &str) -> Option<ScanResult> {
+    trace!(text_len = text.len(), "attempting fast scan via daemon");
     let req = ScanRequest {
         scan_type: ScanType::Fast,
         threshold: 0.0,
@@ -35,7 +42,9 @@ pub fn try_scan_fast(text: &str) -> Option<ScanResult> {
 /// Check if a daemon is running by sending a ping.
 #[must_use]
 pub fn is_daemon_running() -> bool {
+    trace!("checking if daemon is running");
     let Ok(mut stream) = Stream::connect(CONNECT_TIMEOUT) else {
+        trace!("daemon not running (connection failed)");
         return false;
     };
 
@@ -46,10 +55,13 @@ pub fn is_daemon_running() -> bool {
     };
 
     if protocol::write_request(&mut stream, &req).is_err() {
+        trace!("daemon not running (write failed)");
         return false;
     }
 
-    matches!(protocol::read_response(&mut stream), Ok(ScanResponse::Pong))
+    let running = matches!(protocol::read_response(&mut stream), Ok(ScanResponse::Pong));
+    trace!(running, "daemon running check complete");
+    running
 }
 
 /// Spawn the daemon as a detached background process. Fire-and-forget.

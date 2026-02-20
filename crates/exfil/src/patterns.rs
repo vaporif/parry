@@ -6,6 +6,7 @@ use std::sync::LazyLock;
 
 use regex::Regex;
 use serde::Deserialize;
+use tracing::{trace, warn};
 
 /// How a pattern should be matched.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Default, Deserialize)]
@@ -178,11 +179,11 @@ impl PatternConfig {
         }
         match std::fs::read_to_string(&path) {
             Ok(content) => toml::from_str(&content).unwrap_or_else(|e| {
-                eprintln!("parry: failed to parse {}: {e}", path.display());
+                warn!(path = %path.display(), %e, "failed to parse pattern config");
                 Self::default()
             }),
             Err(e) => {
-                eprintln!("parry: failed to read {}: {e}", path.display());
+                warn!(path = %path.display(), %e, "failed to read pattern config");
                 Self::default()
             }
         }
@@ -389,12 +390,20 @@ pub static PATTERNS: LazyLock<CompiledPatterns> = LazyLock::new(CompiledPatterns
 
 /// Check if text contains a sensitive path (convenience function).
 pub fn has_sensitive_path(text: &str) -> bool {
-    PATTERNS.has_sensitive_path(text)
+    let matched = PATTERNS.has_sensitive_path(text);
+    if matched {
+        trace!("sensitive path matched");
+    }
+    matched
 }
 
 /// Check if text contains an exfil domain (convenience function).
 pub fn has_exfil_domain(text: &str) -> bool {
-    PATTERNS.has_exfil_domain(text)
+    let matched = PATTERNS.has_exfil_domain(text);
+    if matched {
+        trace!("exfil domain matched");
+    }
+    matched
 }
 
 #[cfg(test)]

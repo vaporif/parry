@@ -3,6 +3,7 @@
 use eyre::WrapErr;
 use parry_core::config::Config;
 use parry_core::Result;
+use tracing::debug;
 
 pub const MODEL_REPO: &str = "ProtectAI/deberta-v3-small-prompt-injection-v2";
 
@@ -16,11 +17,15 @@ pub fn hf_repo(config: &Config) -> Result<hf_hub::api::sync::ApiRepo> {
 
     let mut builder = ApiBuilder::new();
     if let Some(token) = config.hf_token() {
+        debug!("using HuggingFace token from config");
         builder = builder.with_token(Some(token));
+    } else {
+        debug!("no HuggingFace token configured");
     }
     let api = builder
         .build()
         .wrap_err("failed to build HuggingFace API client")?;
 
+    debug!(repo = MODEL_REPO, "HuggingFace repo handle created");
     Ok(api.model(MODEL_REPO.to_string()))
 }

@@ -17,6 +17,7 @@ data-encoding.workspace = true
 percent-encoding.workspace = true
 html-escape.workspace = true
 clap = { workspace = true, optional = true }
+tracing.workspace = true
 
 [features]
 default = []

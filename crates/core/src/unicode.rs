@@ -1,3 +1,4 @@
+use tracing::trace;
 use unicode_general_category::{get_general_category, GeneralCategory};
 
 /// Returns true if text contains suspicious invisible Unicode characters.
@@ -11,10 +12,18 @@ pub fn has_invisible_unicode(text: &str) -> bool {
 
     for ch in text.chars() {
         match get_general_category(ch) {
-            GeneralCategory::PrivateUse | GeneralCategory::Unassigned => return true,
+            GeneralCategory::PrivateUse => {
+                trace!(char = ?ch, "private-use character detected");
+                return true;
+            }
+            GeneralCategory::Unassigned => {
+                trace!(char = ?ch, "unassigned character detected");
+                return true;
+            }
             GeneralCategory::Format => {
                 cf_count += 1;
                 if cf_count >= 3 {
+                    trace!(cf_count, "format character threshold exceeded");
                     return true;
                 }
             }

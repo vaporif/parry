@@ -19,6 +19,7 @@ use backend::MlBackend;
 use parry_core::config::{Config, MlBackendKind};
 use parry_core::Result;
 use tokenizers::Tokenizer;
+use tracing::{debug, info, instrument, trace};
 
 pub struct MlScanner {
     backend: Box<dyn MlBackend>,
@@ -32,19 +33,23 @@ impl MlScanner {
     /// # Errors
     ///
     /// Returns an error if the model cannot be downloaded or loaded.
+    #[instrument(skip(config), fields(backend = ?config.ml_backend))]
     pub fn load(config: &Config) -> Result<Self> {
+        debug!("loading ML scanner");
         let repo = model::hf_repo(config)?;
 
         let tokenizer_path = repo
             .get("tokenizer.json")
             .map_err(|e| eyre::eyre!("tokenizer download failed: {e}"))?;
         let tokenizer = Tokenizer::from_file(&tokenizer_path).map_err(|e| eyre::eyre!(e))?;
+        debug!("tokenizer loaded");
 
         let backend: Box<dyn MlBackend> = match config.ml_backend {
             MlBackendKind::Auto => load_auto_backend(&repo)?,
             MlBackendKind::Onnx => load_onnx_backend(&repo)?,
             MlBackendKind::Candle => load_candle_backend(&repo)?,
         };
+        info!(backend = ?config.ml_backend, "ML backend initialized");
 
         Ok(Self {
             backend,
@@ -59,8 +64,11 @@ impl MlScanner {
             .encode(text, true)
             .map_err(|e| eyre::eyre!(e))?;
 
-        self.backend
-            .score(encoding.get_ids(), encoding.get_attention_mask())
+        let score = self
+            .backend
+            .score(encoding.get_ids(), encoding.get_attention_mask())?;
+        trace!(score, text_len = text.len(), "chunk scored");
+        Ok(score)
     }
 
     /// Scan text using chunked strategy. Returns true if injection detected.
@@ -68,19 +76,25 @@ impl MlScanner {
     /// # Errors
     ///
     /// Returns an error if scoring any chunk fails.
+    #[instrument(skip(self, text), fields(text_len = text.len(), threshold = self.threshold))]
     pub fn scan_chunked(&mut self, text: &str) -> Result<bool> {
         for chunk in chunker::chunks(text) {
-            if self.score(chunk)? >= self.threshold {
+            let score = self.score(chunk)?;
+            if score >= self.threshold {
+                debug!(score, "injection detected in chunk");
                 return Ok(true);
             }
         }
 
         if let Some((head_tail, _)) = chunker::head_tail(text) {
-            if self.score(&head_tail)? >= self.threshold {
+            let score = self.score(&head_tail)?;
+            if score >= self.threshold {
+                debug!(score, "injection detected in head+tail");
                 return Ok(true);
             }
         }
 
+        trace!("ML scan clean");
         Ok(false)
     }
 }

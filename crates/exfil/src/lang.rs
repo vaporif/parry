@@ -3,6 +3,7 @@
 //! This module provides AST-based analysis of inline code from interpreters,
 //! detecting when code contains both network operations and sensitive file access.
 
+use tracing::{debug, trace};
 use tree_sitter::{Language, Parser, Query, QueryCursor, StreamingIterator};
 
 use super::{has_sensitive_path, patterns};
@@ -42,11 +43,17 @@ pub fn detect_exfil_in_code<L: LangExfilDetector>(
     detector: &L,
     interpreter: &str,
 ) -> Option<String> {
+    trace!(
+        interpreter,
+        code_len = code.len(),
+        "analyzing code for exfil"
+    );
     let mut parser = Parser::new();
     parser.set_language(&detector.language()).ok()?;
 
     let tree = parser.parse(code, None)?;
     if tree.root_node().has_error() {
+        trace!("parse error, falling back to keyword matching");
         // Fall back to keyword matching if parse fails
         return None;
     }
@@ -111,23 +118,27 @@ pub fn detect_exfil_in_code<L: LangExfilDetector>(
 
     // Detection logic: network + sensitive file, or exfil domain, or IP URL
     if result.has_network_sink && result.has_file_source {
+        debug!(interpreter, "detected network + sensitive file exfil");
         return Some(format!(
             "Interpreter '{interpreter}' inline code with network access and sensitive file"
         ));
     }
 
     if result.has_exfil_domain {
+        debug!(interpreter, "detected exfil domain");
         return Some(format!(
             "Interpreter '{interpreter}' inline code targeting exfil domain"
         ));
     }
 
     if result.has_ip_url {
+        debug!(interpreter, "detected IP URL");
         return Some(format!(
             "Interpreter '{interpreter}' inline code targeting IP address"
         ));
     }
 
+    trace!(interpreter, "no exfil detected");
     None
 }
 
