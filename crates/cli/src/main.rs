@@ -59,7 +59,13 @@ fn run_scan(config: &Config) -> ExitCode {
     }
 
     info!(text_len = text.len(), "scanning text");
-    let result = parry_hook::scan_text(text, config);
+    let result = match parry_hook::scan_text(text, config) {
+        Ok(r) => r,
+        Err(e) => {
+            eprintln!("parry: {e}");
+            return ExitCode::FAILURE;
+        }
+    };
     info!(?result, "scan complete");
 
     if result.is_clean() {
@@ -180,7 +186,13 @@ fn run_diff(config: &Config, git_ref: &str, extensions: Option<&str>, full: bool
         scanned += 1;
         debug!(file, "scanning");
         let result = if full {
-            parry_hook::scan_text(&content, config)
+            match parry_hook::scan_text(&content, config) {
+                Ok(r) => r,
+                Err(e) => {
+                    eprintln!("parry: {e}");
+                    return ExitCode::FAILURE;
+                }
+            }
         } else {
             parry_core::scan_text_fast(&content)
         };

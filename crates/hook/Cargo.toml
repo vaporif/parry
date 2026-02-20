@@ -8,7 +8,6 @@ repository.workspace = true
 
 [dependencies]
 parry-core.workspace = true
-parry-ml.workspace = true
 parry-exfil.workspace = true
 parry-daemon.workspace = true
 eyre.workspace = true
@@ -19,10 +18,10 @@ tracing.workspace = true
 
 [features]
 default = ["candle"]
-onnx = ["parry-ml/onnx", "parry-daemon/onnx"]
-onnx-fetch = ["parry-ml/onnx-fetch", "parry-daemon/onnx-fetch"]
-onnx-coreml = ["parry-ml/onnx-coreml", "parry-daemon/onnx-coreml"]
-candle = ["parry-ml/candle", "parry-daemon/candle"]
+onnx = ["parry-daemon/onnx"]
+onnx-fetch = ["parry-daemon/onnx-fetch"]
+onnx-coreml = ["parry-daemon/onnx-coreml"]
+candle = ["parry-daemon/candle"]
 
 [dev-dependencies]
 tempfile.workspace = true

@@ -13,7 +13,7 @@ use std::path::PathBuf;
 use tracing::{debug, instrument, trace};
 
 pub use config::Config;
-pub use error::Result;
+pub use error::{Result, ScanError};
 
 /// Result of scanning text for prompt injection or secrets.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]

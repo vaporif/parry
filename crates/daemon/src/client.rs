@@ -2,8 +2,8 @@
 
 use std::time::Duration;
 
-use parry_core::{Config, ScanResult};
-use tracing::{debug, trace};
+use parry_core::{Config, ScanError, ScanResult};
+use tracing::{debug, info, trace};
 
 use crate::protocol::{self, ScanRequest, ScanResponse, ScanType};
 use crate::transport::Stream;
@@ -93,6 +93,29 @@ pub fn spawn_daemon(config: &Config) {
     }
 
     let _ = cmd.spawn();
+}
+
+/// Ensure the daemon is running. Spawns it if needed and waits for readiness.
+///
+/// # Errors
+///
+/// Returns `ScanError::DaemonStart` if the daemon fails to start within the timeout.
+pub fn ensure_running(config: &Config) -> Result<(), ScanError> {
+    if is_daemon_running() {
+        return Ok(());
+    }
+    info!("daemon not running, starting...");
+    spawn_daemon(config);
+    for delay_ms in [100, 200, 500, 1000, 2000] {
+        std::thread::sleep(Duration::from_millis(delay_ms));
+        if is_daemon_running() {
+            info!("daemon ready");
+            return Ok(());
+        }
+    }
+    Err(ScanError::DaemonStart(
+        "timed out waiting for daemon".into(),
+    ))
 }
 
 fn send_request(req: &ScanRequest) -> Option<ScanResult> {

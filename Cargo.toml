@@ -18,6 +18,7 @@ parry-hook = { path = "crates/hook" }
 
 # Core dependencies
 eyre = "0.6"
+thiserror = "2"
 regex = "1"
 aho-corasick = "1"
 unicode-general-category = "1"

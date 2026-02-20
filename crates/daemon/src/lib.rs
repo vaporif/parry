@@ -8,6 +8,6 @@ pub mod protocol;
 pub mod server;
 pub mod transport;
 
-pub use client::{is_daemon_running, spawn_daemon, try_scan_fast, try_scan_full};
+pub use client::{ensure_running, is_daemon_running, spawn_daemon, try_scan_fast, try_scan_full};
 pub use protocol::{ScanRequest, ScanResponse, ScanType};
 pub use server::{run, DaemonConfig};
