@@ -1,22 +1,11 @@
 use std::path::PathBuf;
 
-/// ML backend selection.
-#[derive(Debug, Clone, Copy, Default, PartialEq, Eq)]
-#[cfg_attr(feature = "clap", derive(clap::ValueEnum))]
-pub enum MlBackendKind {
-    #[default]
-    Auto,
-    Onnx,
-    Candle,
-}
-
 /// Runtime configuration for parry scanning.
 #[derive(Debug, Clone)]
 pub struct Config {
     pub hf_token_path: PathBuf,
     pub threshold: f32,
     pub no_daemon: bool,
-    pub ml_backend: MlBackendKind,
 }
 
 impl Config {
@@ -36,7 +25,6 @@ impl Default for Config {
             hf_token_path: PathBuf::from("/run/secrets/hf-token-scan-injection"),
             threshold: 0.5,
             no_daemon: false,
-            ml_backend: MlBackendKind::Auto,
         }
     }
 }

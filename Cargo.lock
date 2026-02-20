@@ -1783,7 +1783,6 @@ name = "parry-core"
 version = "0.1.0"
 dependencies = [
  "aho-corasick",
- "clap",
  "data-encoding",
  "dirs",
  "eyre",

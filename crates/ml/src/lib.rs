@@ -16,24 +16,33 @@ pub mod candle;
 pub mod onnx;
 
 use backend::MlBackend;
-use parry_core::config::{Config, MlBackendKind};
+use parry_core::config::Config;
 use parry_core::Result;
 use tokenizers::Tokenizer;
 use tracing::{debug, info, instrument, trace};
 
-pub struct MlScanner {
-    backend: Box<dyn MlBackend>,
+/// Concrete backend type selected at compile time.
+#[cfg(feature = "candle")]
+type Backend = candle::CandleBackend;
+#[cfg(all(any(feature = "onnx", feature = "onnx-fetch"), not(feature = "candle")))]
+type Backend = onnx::OnnxBackend;
+
+/// ML scanner parameterized by backend.
+pub type MlScanner = Scanner<Backend>;
+
+pub struct Scanner<B: MlBackend> {
+    backend: B,
     tokenizer: Tokenizer,
     threshold: f32,
 }
 
 impl MlScanner {
-    /// Load the ML scanner with the configured backend.
+    /// Load the ML scanner with the compile-time selected backend.
     ///
     /// # Errors
     ///
     /// Returns an error if the model cannot be downloaded or loaded.
-    #[instrument(skip(config), fields(backend = ?config.ml_backend))]
+    #[instrument(skip(config))]
     pub fn load(config: &Config) -> Result<Self> {
         debug!("loading ML scanner");
         let repo = model::hf_repo(config)?;
@@ -44,12 +53,8 @@ impl MlScanner {
         let tokenizer = Tokenizer::from_file(&tokenizer_path).map_err(|e| eyre::eyre!(e))?;
         debug!("tokenizer loaded");
 
-        let backend: Box<dyn MlBackend> = match config.ml_backend {
-            MlBackendKind::Auto => load_auto_backend(&repo)?,
-            MlBackendKind::Onnx => load_onnx_backend(&repo)?,
-            MlBackendKind::Candle => load_candle_backend(&repo)?,
-        };
-        info!(backend = ?config.ml_backend, "ML backend initialized");
+        let backend = load_backend(&repo)?;
+        info!("ML backend initialized");
 
         Ok(Self {
             backend,
@@ -57,7 +62,9 @@ impl MlScanner {
             threshold: config.threshold,
         })
     }
+}
 
+impl<B: MlBackend> Scanner<B> {
     fn score(&mut self, text: &str) -> Result<f32> {
         let encoding = self
             .tokenizer
@@ -104,54 +111,26 @@ impl MlScanner {
     }
 }
 
-#[allow(clippy::needless_return, unused_variables)]
-fn load_auto_backend(repo: &hf_hub::api::sync::ApiRepo) -> Result<Box<dyn MlBackend>> {
-    #[cfg(feature = "candle")]
-    return load_candle_backend(repo);
-
-    #[cfg(all(any(feature = "onnx", feature = "onnx-fetch"), not(feature = "candle")))]
-    return load_onnx_backend(repo);
-
-    #[cfg(not(any(feature = "onnx", feature = "onnx-fetch", feature = "candle")))]
-    return Err(eyre::eyre!("no ML backend compiled in"));
-}
-
-#[cfg(any(feature = "onnx", feature = "onnx-fetch"))]
-fn load_onnx_backend(repo: &hf_hub::api::sync::ApiRepo) -> Result<Box<dyn MlBackend>> {
-    let model_path = repo
-        .get("onnx/model.onnx")
-        .map_err(|e| eyre::eyre!("model download failed: {e}"))?;
-    Ok(Box::new(onnx::OnnxBackend::load(
-        &model_path.to_string_lossy(),
-    )?))
-}
-
-#[cfg(not(any(feature = "onnx", feature = "onnx-fetch")))]
-fn load_onnx_backend(_repo: &hf_hub::api::sync::ApiRepo) -> Result<Box<dyn MlBackend>> {
-    Err(eyre::eyre!(
-        "onnx backend not compiled in (enable 'onnx' or 'onnx-fetch' feature)"
-    ))
-}
-
 #[cfg(feature = "candle")]
-fn load_candle_backend(repo: &hf_hub::api::sync::ApiRepo) -> Result<Box<dyn MlBackend>> {
+fn load_backend(repo: &hf_hub::api::sync::ApiRepo) -> Result<Backend> {
     let safetensors_path = repo
         .get("model.safetensors")
         .map_err(|e| eyre::eyre!("safetensors download failed: {e}"))?;
     let config_path = repo
         .get("config.json")
         .map_err(|e| eyre::eyre!("config download failed: {e}"))?;
-    Ok(Box::new(candle::CandleBackend::load(
+    candle::CandleBackend::load(
         &safetensors_path.to_string_lossy(),
         &config_path.to_string_lossy(),
-    )?))
+    )
 }
 
-#[cfg(not(feature = "candle"))]
-fn load_candle_backend(_repo: &hf_hub::api::sync::ApiRepo) -> Result<Box<dyn MlBackend>> {
-    Err(eyre::eyre!(
-        "candle backend not compiled in (enable 'candle' feature)"
-    ))
+#[cfg(all(any(feature = "onnx", feature = "onnx-fetch"), not(feature = "candle")))]
+fn load_backend(repo: &hf_hub::api::sync::ApiRepo) -> Result<Backend> {
+    let model_path = repo
+        .get("onnx/model.onnx")
+        .map_err(|e| eyre::eyre!("model download failed: {e}"))?;
+    onnx::OnnxBackend::load(&model_path.to_string_lossy())
 }
 
 #[cfg(any(feature = "onnx", feature = "onnx-fetch", feature = "candle", test))]

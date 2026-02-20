@@ -16,15 +16,10 @@ unicode_skeleton.workspace = true
 data-encoding.workspace = true
 percent-encoding.workspace = true
 html-escape.workspace = true
-clap = { workspace = true, optional = true }
 tracing.workspace = true
 serde = { workspace = true, features = ["derive"] }
 toml.workspace = true
 dirs.workspace = true
-
-[features]
-default = []
-clap = ["dep:clap"]
 
 [dev-dependencies]
 tempfile.workspace = true

@@ -12,7 +12,7 @@ use std::path::PathBuf;
 
 use tracing::{debug, instrument, trace};
 
-pub use config::{Config, MlBackendKind};
+pub use config::Config;
 pub use error::Result;
 
 /// Result of scanning text for prompt injection or secrets.

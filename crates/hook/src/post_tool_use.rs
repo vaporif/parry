@@ -100,7 +100,6 @@ mod tests {
             hf_token_path: PathBuf::from("/nonexistent"),
             threshold: 0.5,
             no_daemon: true,
-            ml_backend: parry_core::MlBackendKind::Auto,
         }
     }
 
