@@ -3,6 +3,7 @@
 use std::hash::{DefaultHasher, Hash, Hasher};
 use std::path::{Path, PathBuf};
 
+use redb::ReadableDatabase;
 use tracing::{debug, instrument, warn};
 
 const GUARD_DB_FILE: &str = ".parry-guard.redb";

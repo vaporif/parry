@@ -78,7 +78,7 @@ tokio = { version = "1", features = ["rt", "macros", "time"] }
 tokio-util = { version = "0.7", features = ["codec"] }
 
 # Hook/storage
-redb = "2"
+redb = "3"
 
 # Tracing
 tracing = "0.1"
