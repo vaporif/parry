@@ -234,12 +234,8 @@ const CODE_NETWORK_INDICATORS: &[&str] = &[
     "http.jl",
     "downloads.download",
     "http.request",
-    "tcpsocket",
-    "udpsocket",
-    "connect(",
     // Tcl
     "http::geturl",
-    "socket",
     // JVM scripting (Groovy/Scala/Kotlin)
     "url.text",
     "url.openconnection",
