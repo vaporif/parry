@@ -17,7 +17,7 @@ pub fn mark(tool_name: &str, session_id: Option<&str>) {
         let _ = write!(context, "\nsession: {sid}");
     }
     if let Err(e) = std::fs::write(&path, context) {
-        eprintln!("parry: failed to write taint file {}: {e}", path.display());
+        tracing::warn!(path = %path.display(), %e, "failed to write taint file");
     }
 }
 

@@ -43,11 +43,6 @@ pub async fn run(config: &Config, daemon_config: &DaemonConfig) -> eyre::Result<
         "unavailable"
     };
     info!(pid = std::process::id(), ml = ml_status, "daemon started");
-    eprintln!(
-        "parry daemon started (pid={}, ml={})",
-        std::process::id(),
-        ml_status
-    );
 
     let idle_timeout = daemon_config.idle_timeout;
     let mut deadline = Instant::now() + idle_timeout;
@@ -63,13 +58,11 @@ pub async fn run(config: &Config, daemon_config: &DaemonConfig) -> eyre::Result<
                     }
                     Err(e) => {
                         warn!(%e, "accept error");
-                        eprintln!("accept error: {e}");
                     }
                 }
             }
             () = tokio::time::sleep_until(deadline) => {
                 info!("idle timeout, shutting down");
-                eprintln!("parry daemon idle timeout, shutting down");
                 break;
             }
         }

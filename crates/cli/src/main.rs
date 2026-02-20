@@ -12,7 +12,27 @@ use tracing_subscriber::{fmt, EnvFilter};
 
 fn init_tracing() {
     let filter = EnvFilter::try_from_env("PARRY_LOG").unwrap_or_else(|_| EnvFilter::new("warn"));
-    fmt().with_env_filter(filter).init();
+
+    let log_file = parry_daemon::transport::parry_dir().and_then(|dir| {
+        std::fs::create_dir_all(&dir)?;
+        std::fs::OpenOptions::new()
+            .create(true)
+            .append(true)
+            .open(dir.join("parry.log"))
+    });
+
+    match log_file {
+        Ok(file) => {
+            fmt()
+                .with_env_filter(filter)
+                .with_writer(std::sync::Mutex::new(file))
+                .with_ansi(false)
+                .init();
+        }
+        Err(_) => {
+            fmt().with_env_filter(filter).init();
+        }
+    }
 }
 
 fn main() -> ExitCode {
@@ -48,7 +68,6 @@ fn run_scan(config: &Config) -> ExitCode {
     let mut text = String::new();
     if std::io::stdin().read_to_string(&mut text).is_err() {
         warn!("failed to read stdin (fail-closed)");
-        eprintln!("parry: failed to read stdin (fail-closed)");
         return ExitCode::FAILURE;
     }
 
@@ -62,7 +81,7 @@ fn run_scan(config: &Config) -> ExitCode {
     let result = match parry_hook::scan_text(text, config) {
         Ok(r) => r,
         Err(e) => {
-            eprintln!("parry: {e}");
+            warn!(%e, "scan failed");
             return ExitCode::FAILURE;
         }
     };
@@ -80,7 +99,6 @@ fn run_hook(config: &Config) -> ExitCode {
     let mut input = String::new();
     if std::io::stdin().read_to_string(&mut input).is_err() {
         warn!("failed to read stdin (fail-closed)");
-        eprintln!("parry: failed to read stdin (fail-closed)");
         return ExitCode::FAILURE;
     }
 
@@ -94,7 +112,6 @@ fn run_hook(config: &Config) -> ExitCode {
         Ok(v) => v,
         Err(e) => {
             warn!(%e, "invalid hook JSON (fail-closed)");
-            eprintln!("parry: invalid hook JSON: {e} (fail-closed)");
             return ExitCode::FAILURE;
         }
     };
@@ -108,7 +125,7 @@ fn run_hook(config: &Config) -> ExitCode {
             info!(tool = %hook_input.tool_name, "threat detected in tool output");
             match serde_json::to_string(&output) {
                 Ok(json) => println!("{json}"),
-                Err(e) => eprintln!("parry: failed to serialize hook output: {e}"),
+                Err(e) => warn!(%e, "failed to serialize hook output"),
             }
         }
     } else {
@@ -117,7 +134,7 @@ fn run_hook(config: &Config) -> ExitCode {
             info!(tool = %hook_input.tool_name, "tool blocked by PreToolUse");
             match serde_json::to_string(&output) {
                 Ok(json) => println!("{json}"),
-                Err(e) => eprintln!("parry: failed to serialize hook output: {e}"),
+                Err(e) => warn!(%e, "failed to serialize hook output"),
             }
         }
     }
@@ -135,7 +152,6 @@ fn run_diff(config: &Config, git_ref: &str, extensions: Option<&str>, full: bool
         Ok(o) => o,
         Err(e) => {
             warn!(%e, "failed to run git diff");
-            eprintln!("parry: failed to run git diff: {e}");
             return ExitCode::FAILURE;
         }
     };
@@ -143,7 +159,6 @@ fn run_diff(config: &Config, git_ref: &str, extensions: Option<&str>, full: bool
     if !output.status.success() {
         let stderr = String::from_utf8_lossy(&output.stderr);
         warn!(%stderr, "git diff failed");
-        eprintln!("parry: git diff failed: {}", stderr.trim());
         return ExitCode::FAILURE;
     }
 
@@ -189,7 +204,7 @@ fn run_diff(config: &Config, git_ref: &str, extensions: Option<&str>, full: bool
             match parry_hook::scan_text(&content, config) {
                 Ok(r) => r,
                 Err(e) => {
-                    eprintln!("parry: {e}");
+                    warn!(%e, "scan failed");
                     return ExitCode::FAILURE;
                 }
             }
@@ -231,7 +246,6 @@ fn run_serve(config: &Config, idle_timeout: u64) -> ExitCode {
         Ok(rt) => rt,
         Err(e) => {
             warn!(%e, "failed to build tokio runtime");
-            eprintln!("runtime error: {e}");
             return ExitCode::FAILURE;
         }
     };
@@ -243,7 +257,6 @@ fn run_serve(config: &Config, idle_timeout: u64) -> ExitCode {
         }
         Err(e) => {
             warn!(%e, "daemon error");
-            eprintln!("daemon error: {e}");
             ExitCode::FAILURE
         }
     }
