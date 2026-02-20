@@ -28,10 +28,6 @@ pub struct Cli {
           value_parser = threshold_in_range)]
     pub threshold: f32,
 
-    /// Disable daemon communication (always scan inline)
-    #[arg(long, env = "PARRY_NO_DAEMON")]
-    pub no_daemon: bool,
-
     #[command(subcommand)]
     pub command: Option<Command>,
 }

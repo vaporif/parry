@@ -5,7 +5,6 @@ use std::path::PathBuf;
 pub struct Config {
     pub hf_token_path: PathBuf,
     pub threshold: f32,
-    pub no_daemon: bool,
 }
 
 impl Config {
@@ -24,7 +23,6 @@ impl Default for Config {
         Self {
             hf_token_path: PathBuf::from("/run/secrets/hf-token-scan-injection"),
             threshold: 0.5,
-            no_daemon: false,
         }
     }
 }

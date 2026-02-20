@@ -88,13 +88,11 @@ impl PreToolUseOutput {
 #[instrument(skip(text, config), fields(text_len = text.len()))]
 pub fn scan_text(text: &str, config: &Config) -> ScanResult {
     // Try daemon first (None = fallback to inline scanning)
-    if !config.no_daemon {
-        if let Some(result) = parry_daemon::try_scan_full(text, config) {
-            debug!(?result, "scan complete via daemon");
-            return result;
-        }
-        debug!("daemon unavailable, falling back to inline scan");
+    if let Some(result) = parry_daemon::try_scan_full(text, config) {
+        debug!(?result, "scan complete via daemon");
+        return result;
     }
+    debug!("daemon unavailable, falling back to inline scan");
 
     let fast = parry_core::scan_text_fast(text);
     if !fast.is_clean() {
@@ -189,7 +187,6 @@ mod tests {
         Config {
             hf_token_path: PathBuf::from("/nonexistent"),
             threshold: 0.5,
-            no_daemon: true,
         }
     }
 

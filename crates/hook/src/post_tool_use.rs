@@ -82,9 +82,6 @@ fn warning_for_result(result: parry_core::ScanResult) -> Option<HookOutput> {
 }
 
 fn maybe_spawn_daemon(config: &Config) {
-    if config.no_daemon {
-        return;
-    }
     if !parry_daemon::is_daemon_running() {
         parry_daemon::spawn_daemon(config);
     }
@@ -99,7 +96,6 @@ mod tests {
         Config {
             hf_token_path: PathBuf::from("/nonexistent"),
             threshold: 0.5,
-            no_daemon: true,
         }
     }
 

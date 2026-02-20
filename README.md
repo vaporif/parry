@@ -184,7 +184,6 @@ Fail-closed: panics exit 1, ML errors → suspicious, bad input → failure.
 
 | Env | Default | Description |
 |-----|---------|-------------|
-| `PARRY_NO_DAEMON` | false | Always scan inline |
 | `CLAUDE_GUARD_THRESHOLD` | 0.5 | ML threshold (0.0-1.0) |
 | `CLAUDE_GUARD_HF_TOKEN_PATH` | /run/secrets/hf-token-scan-injection | HF token file |
 

@@ -29,7 +29,6 @@ fn main() -> ExitCode {
     let config = Config {
         hf_token_path: cli.hf_token_path,
         threshold: cli.threshold,
-        no_daemon: cli.no_daemon,
     };
 
     match cli.command {
