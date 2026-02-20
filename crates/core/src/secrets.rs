@@ -5,6 +5,8 @@ static SECRET_PATTERNS: LazyLock<RegexSet> = LazyLock::new(|| {
     RegexSet::new([
         // AWS Access Key ID
         r"AKIA[0-9A-Z]{16}",
+        // AWS Secret Access Key (40 chars, base64-ish)
+        r#"(?i)aws.{0,20}secret.{0,20}['"][A-Za-z0-9/+=]{40}['"]"#,
         // GitHub Personal Access Token (classic)
         r"gh[ps]_[A-Za-z0-9_]{36,}",
         // GitHub Fine-grained PAT
@@ -21,6 +23,10 @@ static SECRET_PATTERNS: LazyLock<RegexSet> = LazyLock::new(|| {
         r"[rs]k_(test|live)_[A-Za-z0-9]{24,}",
         // Google API key
         r"AIza[0-9A-Za-z\-_]{35}",
+        // Google OAuth client secret
+        r"GOCSPX-[A-Za-z0-9_-]{28}",
+        // Firebase
+        r"AAAA[A-Za-z0-9_-]{7}:[A-Za-z0-9_-]{140}",
         // JWT token
         r"eyJ[A-Za-z0-9_-]{10,}\.eyJ[A-Za-z0-9_-]{10,}\.[A-Za-z0-9_-]+",
         // Private key header
@@ -35,6 +41,52 @@ static SECRET_PATTERNS: LazyLock<RegexSet> = LazyLock::new(|| {
         r"SK[a-f0-9]{32}",
         // Discord bot token
         r"[MN][A-Za-z0-9]{23,}\.[A-Za-z0-9_-]{6}\.[A-Za-z0-9_-]{27,}",
+        // Heroku API key
+        r"[hH]eroku.{0,20}[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}",
+        // Datadog API key
+        r#"(?i)datadog.{0,20}['"][a-f0-9]{32}['"]"#,
+        // Datadog APP key
+        r#"(?i)datadog.{0,20}['"][a-f0-9]{40}['"]"#,
+        // Netlify access token
+        r#"(?i)netlify.{0,20}['"][A-Za-z0-9_-]{40,}['"]"#,
+        // Vercel token
+        r#"(?i)vercel.{0,20}['"][A-Za-z0-9]{24}['"]"#,
+        // Supabase key (anon/service)
+        r"sbp_[a-f0-9]{40}",
+        // Supabase JWT-style key
+        r"eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9\.[A-Za-z0-9_-]+\.[A-Za-z0-9_-]+",
+        // Azure Storage Account Key (88 chars base64)
+        r#"(?i)azure.{0,20}(account|storage).{0,20}key.{0,20}['"][A-Za-z0-9+/]{86}==['"]"#,
+        // Azure Client Secret
+        r#"(?i)azure.{0,20}(client|app).{0,20}secret.{0,20}['"][A-Za-z0-9~._-]{34}['"]"#,
+        // MongoDB connection string with password
+        r"mongodb(\+srv)?://[^:]+:[^@]+@[^/]+",
+        // PostgreSQL connection string with password
+        r"postgres(ql)?://[^:]+:[^@]+@[^/]+",
+        // MySQL connection string with password
+        r"mysql://[^:]+:[^@]+@[^/]+",
+        // Redis connection string with password
+        r"redis://:[^@]+@[^/]+",
+        // Mailgun API key
+        r"key-[a-f0-9]{32}",
+        // Mailchimp API key
+        r"[a-f0-9]{32}-us[0-9]{1,2}",
+        // DigitalOcean token
+        r"dop_v1_[a-f0-9]{64}",
+        // DigitalOcean OAuth
+        r"doo_v1_[a-f0-9]{64}",
+        // Linear API key
+        r"lin_api_[A-Za-z0-9]{40}",
+        // Doppler token
+        r"dp\.pt\.[A-Za-z0-9]{40,}",
+        // Planetscale password
+        r"pscale_pw_[A-Za-z0-9_-]{40,}",
+        // Grafana API key
+        r"eyJrIjoi[A-Za-z0-9_-]{50,}",
+        // HashiCorp Vault token
+        r"hvs\.[A-Za-z0-9_-]{24,}",
+        // Pulumi access token
+        r"pul-[a-f0-9]{40}",
     ])
     .expect("secret patterns should compile")
 });
@@ -139,5 +191,89 @@ mod tests {
         assert!(!has_secret("The API key format is documented here"));
         assert!(!has_secret("ghp_tooshort"));
         assert!(!has_secret("Just a regular sentence with no secrets."));
+    }
+
+    // === New secret pattern tests ===
+
+    #[test]
+    fn detects_heroku_api_key() {
+        assert!(has_secret(
+            "heroku_api_key=12345678-1234-1234-1234-123456789abc"
+        ));
+    }
+
+    #[test]
+    fn detects_mongodb_uri() {
+        assert!(has_secret("mongodb://user:password@host:27017/database"));
+        assert!(has_secret(
+            "mongodb+srv://user:password@cluster.mongodb.net/db"
+        ));
+    }
+
+    #[test]
+    fn detects_postgres_uri() {
+        assert!(has_secret("postgres://user:password@host:5432/database"));
+        assert!(has_secret("postgresql://admin:secret@db.example.com/prod"));
+    }
+
+    #[test]
+    fn detects_mysql_uri() {
+        assert!(has_secret("mysql://root:password@localhost:3306/mydb"));
+    }
+
+    #[test]
+    fn detects_redis_uri() {
+        assert!(has_secret("redis://:secretpassword@redis.example.com:6379"));
+    }
+
+    #[test]
+    fn detects_digitalocean_token() {
+        assert!(has_secret(&format!("dop_v1_{}", "a".repeat(64))));
+        assert!(has_secret(&format!("doo_v1_{}", "b".repeat(64))));
+    }
+
+    #[test]
+    fn detects_linear_api_key() {
+        assert!(has_secret(&format!("lin_api_{}", "a".repeat(40))));
+    }
+
+    #[test]
+    fn detects_mailgun_key() {
+        assert!(has_secret(&format!("key-{}", "a".repeat(32))));
+    }
+
+    #[test]
+    fn detects_mailchimp_key() {
+        assert!(has_secret(&format!("{}-us12", "a".repeat(32))));
+    }
+
+    #[test]
+    fn detects_doppler_token() {
+        assert!(has_secret(&format!("dp.pt.{}", "a".repeat(40))));
+    }
+
+    #[test]
+    fn detects_planetscale_password() {
+        assert!(has_secret(&format!("pscale_pw_{}", "a".repeat(40))));
+    }
+
+    #[test]
+    fn detects_vault_token() {
+        assert!(has_secret(&format!("hvs.{}", "a".repeat(24))));
+    }
+
+    #[test]
+    fn detects_pulumi_token() {
+        assert!(has_secret(&format!("pul-{}", "a".repeat(40))));
+    }
+
+    #[test]
+    fn detects_supabase_key() {
+        assert!(has_secret(&format!("sbp_{}", "a".repeat(40))));
+    }
+
+    #[test]
+    fn detects_google_oauth_secret() {
+        assert!(has_secret(&format!("GOCSPX-{}", "a".repeat(28))));
     }
 }

