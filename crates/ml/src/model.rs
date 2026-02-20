@@ -16,9 +16,9 @@ pub fn hf_repo(config: &Config) -> Result<hf_hub::api::sync::ApiRepo> {
     use hf_hub::api::sync::ApiBuilder;
 
     let mut builder = ApiBuilder::new();
-    if let Some(token) = config.hf_token() {
+    if let Some(ref token) = config.hf_token {
         debug!("using HuggingFace token from config");
-        builder = builder.with_token(Some(token));
+        builder = builder.with_token(Some(token.clone()));
     } else {
         debug!("no HuggingFace token configured");
     }

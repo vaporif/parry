@@ -76,8 +76,8 @@ pub fn spawn_daemon(config: &Config) {
     // Forward config
     cmd.arg("--threshold").arg(config.threshold.to_string());
 
-    if config.hf_token_path.exists() {
-        cmd.arg("--hf-token-path").arg(&config.hf_token_path);
+    if let Some(ref token) = config.hf_token {
+        cmd.arg("--hf-token").arg(token);
     }
 
     // Detach: null stdio, don't wait

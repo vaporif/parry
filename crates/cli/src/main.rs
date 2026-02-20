@@ -47,7 +47,7 @@ fn main() -> ExitCode {
     let cli = cli::Cli::parse();
 
     let config = Config {
-        hf_token_path: cli.hf_token_path,
+        hf_token: cli.resolve_hf_token(),
         threshold: cli.threshold,
     };
 

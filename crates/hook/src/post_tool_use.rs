@@ -87,11 +87,10 @@ fn warning_for_result(result: parry_core::ScanResult) -> Option<HookOutput> {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use std::path::PathBuf;
 
     fn test_config() -> Config {
         Config {
-            hf_token_path: PathBuf::from("/nonexistent"),
+            hf_token: None,
             threshold: 0.5,
         }
     }
