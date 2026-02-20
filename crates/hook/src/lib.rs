@@ -7,9 +7,16 @@ pub mod post_tool_use;
 pub mod pre_tool_use;
 pub mod taint;
 
+use std::sync::{LazyLock, Mutex};
+
 use parry_core::{Config, ScanResult};
 use serde::{Deserialize, Serialize};
-use tracing::{debug, instrument, warn};
+use tracing::{debug, info, instrument, warn};
+
+/// Cached ML scanner for inline scans (when daemon unavailable).
+/// Loads once on first use, reuses for subsequent scans.
+static ML_SCANNER: LazyLock<Mutex<Option<parry_ml::MlScanner>>> =
+    LazyLock::new(|| Mutex::new(None));
 
 #[derive(Debug, Deserialize)]
 pub struct HookInput {
@@ -77,6 +84,7 @@ impl PreToolUseOutput {
 /// Run all scans (unicode + substring + secrets + ML) on the given text.
 /// Tries the daemon first if available, falls back to inline scanning.
 #[must_use]
+#[allow(clippy::missing_panics_doc)] // expect inside catch_unwind
 #[instrument(skip(text, config), fields(text_len = text.len()))]
 pub fn scan_text(text: &str, config: &Config) -> ScanResult {
     // Try daemon first (None = fallback to inline scanning)
@@ -96,8 +104,22 @@ pub fn scan_text(text: &str, config: &Config) -> ScanResult {
 
     // ML scan with fail-closed: panics or errors → treat as injection
     let stripped = parry_core::unicode::strip_invisible(text);
+    let threshold = config.threshold;
+
+    #[allow(clippy::significant_drop_tightening)] // guard must outlive scanner ref
     let ml_result = std::panic::catch_unwind(std::panic::AssertUnwindSafe(|| {
-        parry_ml::MlScanner::load(config).and_then(|mut s| s.scan_chunked(&stripped))
+        let mut guard = ML_SCANNER
+            .lock()
+            .unwrap_or_else(std::sync::PoisonError::into_inner);
+
+        if guard.is_none() {
+            info!("loading ML scanner (cached for future scans)");
+            *guard = Some(parry_ml::MlScanner::load(config)?);
+        }
+
+        let scanner = guard.as_mut().expect("scanner just initialized");
+        scanner.set_threshold(threshold);
+        scanner.scan_chunked(&stripped)
     }));
 
     match ml_result {

@@ -71,6 +71,11 @@ impl MlScanner {
         Ok(score)
     }
 
+    /// Update the detection threshold.
+    pub const fn set_threshold(&mut self, threshold: f32) {
+        self.threshold = threshold;
+    }
+
     /// Scan text using chunked strategy. Returns true if injection detected.
     ///
     /// # Errors
