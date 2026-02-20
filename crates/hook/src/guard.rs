@@ -134,22 +134,31 @@ fn guard_db_path() -> Option<PathBuf> {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use std::sync::MutexGuard;
+
+    // Mutex to serialize tests that modify global state (cwd, env vars).
+    static TEST_MUTEX: std::sync::Mutex<()> = std::sync::Mutex::new(());
 
     // RAII guard that restores cwd and cleans env on drop (even on panic).
-    struct TestGuard {
+    struct TestGuard<'a> {
         prev_cwd: PathBuf,
+        _lock: MutexGuard<'a, ()>,
     }
 
-    impl TestGuard {
+    impl<'a> TestGuard<'a> {
         fn new(dir: &Path) -> Self {
+            let lock = TEST_MUTEX.lock().unwrap_or_else(|e| e.into_inner());
             let prev_cwd = std::env::current_dir().unwrap();
             unsafe { std::env::set_var("PARRY_RUNTIME_DIR", dir) };
             std::env::set_current_dir(dir).unwrap();
-            Self { prev_cwd }
+            Self {
+                prev_cwd,
+                _lock: lock,
+            }
         }
     }
 
-    impl Drop for TestGuard {
+    impl Drop for TestGuard<'_> {
         fn drop(&mut self) {
             let _ = std::env::set_current_dir(&self.prev_cwd);
             unsafe { std::env::remove_var("PARRY_RUNTIME_DIR") };
