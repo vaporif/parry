@@ -53,4 +53,16 @@ pub enum Command {
         #[arg(long, default_value = "1800")]
         idle_timeout: u64,
     },
+    /// Scan only files changed since a git ref (commit, branch, tag)
+    Diff {
+        /// Git ref to compare against (e.g., main, HEAD~5, abc123)
+        #[arg(name = "REF")]
+        git_ref: String,
+        /// Only scan specific file extensions (comma-separated, e.g., "md,txt,py")
+        #[arg(long, short = 'e')]
+        extensions: Option<String>,
+        /// Run full ML scan (slow). Default is fast scan only (patterns + unicode + secrets)
+        #[arg(long)]
+        full: bool,
+    },
 }
