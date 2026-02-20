@@ -163,7 +163,7 @@ impl CompiledSecrets {
 
         let regex_set = RegexSet::new(&patterns).unwrap_or_else(|e| {
             warn!(%e, "failed to compile secret patterns, using defaults");
-            RegexSet::new(DEFAULT_SECRET_PATTERNS).expect("default patterns should compile")
+            RegexSet::new(DEFAULT_SECRET_PATTERNS).unwrap_or_else(|_| unreachable!())
         });
 
         Self {

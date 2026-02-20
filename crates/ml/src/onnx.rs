@@ -39,7 +39,9 @@ impl super::backend::MlBackend for OnnxBackend {
             .run(ort::inputs![input_ids_tensor, attention_mask_tensor])?;
 
         let logits_view = outputs[0].try_extract_array::<f32>()?;
-        let logits = logits_view.as_slice().expect("contiguous logits tensor");
+        let logits = logits_view
+            .as_slice()
+            .ok_or_else(|| eyre::eyre!("non-contiguous logits tensor"))?;
 
         Ok(super::softmax_injection_prob(logits))
     }

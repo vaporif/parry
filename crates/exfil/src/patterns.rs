@@ -365,11 +365,11 @@ impl CompiledPatterns {
     #[allow(clippy::trivial_regex)]
     fn build_domain_regex(domains: &[String]) -> Regex {
         if domains.is_empty() {
-            return Regex::new(r"^$").unwrap();
+            return Regex::new(r"^$").unwrap_or_else(|_| unreachable!());
         }
         let escaped: Vec<String> = domains.iter().map(|d| regex::escape(d)).collect();
         let pattern = format!(r"(?i)(^|[./])({})($|[:/])", escaped.join("|"));
-        Regex::new(&pattern).unwrap_or_else(|_| Regex::new(r"^$").unwrap())
+        Regex::new(&pattern).unwrap_or_else(|_| unreachable!())
     }
 
     /// Check if text contains a sensitive path.

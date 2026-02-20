@@ -8,14 +8,16 @@ use tracing::{debug, instrument, trace};
 use tree_sitter::{Node, Parser};
 
 /// Regex for detecting `xxd` as a command (word boundary).
-static XXD_REGEX: LazyLock<Regex> = LazyLock::new(|| Regex::new(r"\bxxd\b").unwrap());
+static XXD_REGEX: LazyLock<Regex> =
+    LazyLock::new(|| Regex::new(r"\bxxd\b").unwrap_or_else(|_| unreachable!()));
 
 /// Regex for detecting `od` as a command (word boundary).
-static OD_REGEX: LazyLock<Regex> = LazyLock::new(|| Regex::new(r"\bod\b").unwrap());
+static OD_REGEX: LazyLock<Regex> =
+    LazyLock::new(|| Regex::new(r"\bod\b").unwrap_or_else(|_| unreachable!()));
 
 /// Regex for bash substring/parameter expansion: ${var:0:1}
 static BASH_SUBSTRING_REGEX: LazyLock<Regex> =
-    LazyLock::new(|| Regex::new(r"\$\{[^}]+:\d+").unwrap());
+    LazyLock::new(|| Regex::new(r"\$\{[^}]+:\d+").unwrap_or_else(|_| unreachable!()));
 
 mod elixir;
 mod groovy;
@@ -523,7 +525,7 @@ fn has_suspicious_context(command: &str) -> bool {
 
 /// Try to decode hex escape sequences like $'\x63\x75\x72\x6c'.
 fn try_decode_hex_escapes(text: &str) -> Option<String> {
-    let mut result = String::new();
+    let mut result = String::with_capacity(text.len());
     let mut chars = text.chars().peekable();
 
     while let Some(c) = chars.next() {
@@ -547,7 +549,7 @@ fn try_decode_hex_escapes(text: &str) -> Option<String> {
 
 /// Try to decode octal escape sequences like $'\143\165\162\154'.
 fn try_decode_octal_escapes(text: &str) -> Option<String> {
-    let mut result = String::new();
+    let mut result = String::with_capacity(text.len());
     let mut chars = text.chars().peekable();
 
     while let Some(c) = chars.next() {
@@ -627,7 +629,6 @@ fn check_node(node: Node, source: &[u8]) -> Option<String> {
         "redirected_statement" => check_redirect(node, source),
         "function_definition" => check_function_definition(node, source),
         _ => {
-            // Recurse into children
             let mut cursor = node.walk();
             for child in node.children(&mut cursor) {
                 if let Some(reason) = check_node(child, source) {
@@ -1027,7 +1028,10 @@ fn node_text<'a>(node: Node, source: &'a [u8]) -> &'a str {
 }
 
 fn basename(path: &str) -> &str {
-    path.rsplit('/').next().unwrap_or(path)
+    match path.rsplit_once('/') {
+        Some((_, name)) => name,
+        None => path,
+    }
 }
 
 fn is_interpreter(name: &str) -> bool {

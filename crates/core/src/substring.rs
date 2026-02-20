@@ -62,7 +62,7 @@ static SECURITY_SUBSTRINGS: LazyLock<AhoCorasick> = LazyLock::new(|| {
             "botnet",
             "zero-day exploit",
         ])
-        .expect("security substrings should compile")
+        .unwrap_or_else(|_| unreachable!())
 });
 
 pub fn has_security_substring(text: &str) -> bool {

@@ -274,7 +274,7 @@ fn try_rot13(text: &str) -> Option<String> {
 
 fn dedup(v: &mut Vec<String>) {
     let mut seen = std::collections::HashSet::with_capacity(v.len());
-    v.retain(|s| seen.insert(s.clone()));
+    v.retain(|item| seen.insert(item.clone()));
 }
 
 #[cfg(test)]

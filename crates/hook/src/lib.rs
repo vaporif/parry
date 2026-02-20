@@ -117,7 +117,7 @@ pub fn scan_text(text: &str, config: &Config) -> ScanResult {
             *guard = Some(parry_ml::MlScanner::load(config)?);
         }
 
-        let scanner = guard.as_mut().expect("scanner just initialized");
+        let scanner = guard.as_mut().unwrap_or_else(|| unreachable!());
         scanner.set_threshold(threshold);
         scanner.scan_chunked(&stripped)
     }));

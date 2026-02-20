@@ -82,10 +82,17 @@ pub async fn run(config: &Config, daemon_config: &DaemonConfig) -> eyre::Result<
 }
 
 fn load_ml_scanner(config: &Config) -> Option<MlScanner> {
-    let result = std::panic::catch_unwind(std::panic::AssertUnwindSafe(|| {
-        MlScanner::load(config).ok()
-    }));
-    result.unwrap_or(None)
+    match std::panic::catch_unwind(std::panic::AssertUnwindSafe(|| MlScanner::load(config))) {
+        Ok(Ok(scanner)) => Some(scanner),
+        Ok(Err(e)) => {
+            warn!(%e, "ML scanner failed to load");
+            None
+        }
+        Err(_) => {
+            warn!("ML scanner panicked during load");
+            None
+        }
+    }
 }
 
 async fn handle_connection(
