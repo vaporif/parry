@@ -46,7 +46,12 @@ pub async fn run(config: &Config, daemon_config: &DaemonConfig) -> eyre::Result<
         "unavailable"
     };
     let cache_status = if cache.is_some() { "loaded" } else { "off" };
-    info!(pid = std::process::id(), ml = ml_status, cache = cache_status, "daemon started");
+    info!(
+        pid = std::process::id(),
+        ml = ml_status,
+        cache = cache_status,
+        "daemon started"
+    );
 
     if let Some(ref c) = cache {
         let c = Arc::clone(c);

@@ -28,6 +28,7 @@
         "cargo"
         "clippy"
         "rustc"
+        "rustfmt"
         "rust-src"
         "rust-analyzer"
       ];
@@ -37,6 +38,9 @@
           [
             toolchain
             pkgs.just
+            pkgs.taplo
+            pkgs.typos
+            pkgs.actionlint
           ]
           ++ pkgs.lib.optionals pkgs.stdenv.isDarwin [
             pkgs.apple-sdk_15

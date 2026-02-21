@@ -24,8 +24,16 @@ tracing-subscriber.workspace = true
 [features]
 default = ["candle"]
 onnx = ["parry-ml/onnx", "parry-daemon/onnx", "parry-hook/onnx"]
-onnx-fetch = ["parry-ml/onnx-fetch", "parry-daemon/onnx-fetch", "parry-hook/onnx-fetch"]
-onnx-coreml = ["parry-ml/onnx-coreml", "parry-daemon/onnx-coreml", "parry-hook/onnx-coreml"]
+onnx-fetch = [
+  "parry-ml/onnx-fetch",
+  "parry-daemon/onnx-fetch",
+  "parry-hook/onnx-fetch",
+]
+onnx-coreml = [
+  "parry-ml/onnx-coreml",
+  "parry-daemon/onnx-coreml",
+  "parry-hook/onnx-coreml",
+]
 candle = ["parry-ml/candle", "parry-daemon/candle", "parry-hook/candle"]
 
 [lints]
