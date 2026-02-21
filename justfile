@@ -59,3 +59,7 @@ scan:
 # Start daemon
 serve:
     cargo run -- serve
+
+# Set up git hooks
+setup-hooks:
+    git config core.hooksPath .githooks
