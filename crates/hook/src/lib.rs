@@ -2,9 +2,11 @@
 //!
 //! Provides pre-tool-use blocking and post-tool-use scanning for Claude Code hooks.
 
-pub mod guard;
+mod cache;
+pub mod claude_md;
 pub mod post_tool_use;
 pub mod pre_tool_use;
+pub mod project_audit;
 pub mod taint;
 
 use parry_core::{Config, ScanError, ScanResult};
@@ -13,10 +15,13 @@ use tracing::instrument;
 
 #[derive(Debug, Deserialize)]
 pub struct HookInput {
-    pub tool_name: String,
+    pub tool_name: Option<String>,
+    #[serde(default)]
     pub tool_input: serde_json::Value,
     pub tool_response: Option<String>,
     pub session_id: Option<String>,
+    pub hook_event_name: Option<String>,
+    pub cwd: Option<String>,
 }
 
 #[derive(Debug, Serialize)]
@@ -39,6 +44,16 @@ impl HookOutput {
         Self {
             hook_specific_output: HookSpecificOutput {
                 hook_event_name: "PostToolUse".to_string(),
+                additional_context: message.to_string(),
+            },
+        }
+    }
+
+    #[must_use]
+    pub fn user_prompt_warning(message: &str) -> Self {
+        Self {
+            hook_specific_output: HookSpecificOutput {
+                hook_event_name: "UserPromptSubmit".to_string(),
                 additional_context: message.to_string(),
             },
         }

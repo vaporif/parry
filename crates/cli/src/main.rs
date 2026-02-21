@@ -116,22 +116,25 @@ fn run_hook(config: &Config) -> ExitCode {
         }
     };
 
-    debug!(tool = %hook_input.tool_name, "processing hook");
-
-    // Auto-detect: tool_response present → PostToolUse, absent → PreToolUse
-    if hook_input.tool_response.is_some() {
-        debug!("detected PostToolUse hook");
+    // Dispatch by event type
+    if hook_input.hook_event_name.as_deref() == Some("UserPromptSubmit") {
+        debug!("detected UserPromptSubmit hook");
+        run_audit(&hook_input);
+    } else if hook_input.tool_response.is_some() {
+        let tool = hook_input.tool_name.as_deref().unwrap_or("unknown");
+        debug!(tool, "detected PostToolUse hook");
         if let Some(output) = parry_hook::post_tool_use::process(&hook_input, config) {
-            info!(tool = %hook_input.tool_name, "threat detected in tool output");
+            info!(tool, "threat detected in tool output");
             match serde_json::to_string(&output) {
                 Ok(json) => println!("{json}"),
                 Err(e) => warn!(%e, "failed to serialize hook output"),
             }
         }
     } else {
-        debug!("detected PreToolUse hook");
+        let tool = hook_input.tool_name.as_deref().unwrap_or("unknown");
+        debug!(tool, "detected PreToolUse hook");
         if let Some(output) = parry_hook::pre_tool_use::process(&hook_input) {
-            info!(tool = %hook_input.tool_name, "tool blocked by PreToolUse");
+            info!(tool, "tool blocked by PreToolUse");
             match serde_json::to_string(&output) {
                 Ok(json) => println!("{json}"),
                 Err(e) => warn!(%e, "failed to serialize hook output"),
@@ -140,6 +143,33 @@ fn run_hook(config: &Config) -> ExitCode {
     }
 
     ExitCode::SUCCESS // hooks always exit clean
+}
+
+fn run_audit(hook_input: &parry_hook::HookInput) {
+    let dir = hook_input
+        .cwd
+        .as_ref()
+        .map(std::path::PathBuf::from)
+        .or_else(|| std::env::current_dir().ok());
+
+    let Some(dir) = dir else {
+        warn!("no cwd available for audit");
+        return;
+    };
+
+    let warnings = parry_hook::project_audit::scan(&dir);
+    if warnings.is_empty() {
+        debug!("audit clean");
+        return;
+    }
+
+    let message = parry_hook::project_audit::format_warnings(&warnings);
+    info!(count = warnings.len(), "audit warnings");
+    let output = parry_hook::HookOutput::user_prompt_warning(&message);
+    match serde_json::to_string(&output) {
+        Ok(json) => println!("{json}"),
+        Err(e) => warn!(%e, "failed to serialize audit output"),
+    }
 }
 
 fn run_diff(config: &Config, git_ref: &str, extensions: Option<&str>, full: bool) -> ExitCode {

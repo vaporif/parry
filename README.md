@@ -35,14 +35,16 @@ echo "suspicious" | parry --threshold 0.7 scan
 ```json
 {
   "hooks": {
+    "PreToolUse": [{ "command": "parry hook", "timeout": 1000 }],
     "PostToolUse": [{ "command": "parry hook", "timeout": 5000 }],
-    "PreToolUse": [{ "command": "parry hook", "timeout": 1000 }]
+    "UserPromptSubmit": [{ "command": "parry hook", "timeout": 2000 }]
   }
 }
 ```
 
+- **PreToolUse**: Scans CLAUDE.md files for injection, blocks exfil bash commands, enforces taint
 - **PostToolUse**: Scans tool output for injection/secrets/exfil
-- **PreToolUse**: Blocks dangerous bash commands before execution
+- **UserPromptSubmit**: Audits `.claude/` directory for dangerous permissions, injected commands, hook scripts
 
 ### Daemon Mode
 
@@ -52,7 +54,7 @@ Keep ML model loaded in memory for faster scans:
 parry serve --idle-timeout 1800  # exits after 30min idle
 ```
 
-Hook calls auto-connect to daemon if running, otherwise scan inline.
+Hook calls auto-start the daemon if not running (exponential backoff).
 
 ## Detection Layers
 
@@ -184,8 +186,9 @@ Fail-closed: panics exit 1, ML errors → suspicious, bad input → failure.
 
 | Env | Default | Description |
 |-----|---------|-------------|
-| `CLAUDE_GUARD_THRESHOLD` | 0.5 | ML threshold (0.0-1.0) |
-| `CLAUDE_GUARD_HF_TOKEN_PATH` | /run/secrets/hf-token-scan-injection | HF token file |
+| `PARRY_THRESHOLD` | 0.5 | ML threshold (0.0-1.0) |
+| `HF_TOKEN` | — | HuggingFace token (direct value) |
+| `HF_TOKEN_PATH` | /run/secrets/hf-token-scan-injection | HuggingFace token file |
 
 ## Development
 
@@ -197,7 +200,7 @@ cargo clippy --workspace
 
 ## Credits
 
-- **ML model**: [ProtectAI/deberta-v3-base-prompt-injection-v2](https://huggingface.co/ProtectAI/deberta-v3-base-prompt-injection-v2)
+- **ML model**: [ProtectAI/deberta-v3-small-prompt-injection-v2](https://huggingface.co/ProtectAI/deberta-v3-small-prompt-injection-v2)
   - Same model used by [LLM Guard](https://github.com/protectai/llm-guard)
 - **Exfil patterns**: Inspired by [GuardDog](https://github.com/DataDog/guarddog) (Datadog's malicious package scanner)
 

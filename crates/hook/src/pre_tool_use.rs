@@ -15,13 +15,13 @@ pub fn process(input: &HookInput) -> Option<PreToolUseOutput> {
     }
 
     // Check CLAUDE.md files for prompt injection
-    if let Some(reason) = crate::guard::check_claude_md() {
+    if let Some(reason) = crate::claude_md::check() {
         crate::taint::mark("CLAUDE.md", input.session_id.as_deref());
         return Some(PreToolUseOutput::deny(&reason));
     }
 
     // Check Bash commands for exfiltration patterns
-    if input.tool_name == "Bash" {
+    if input.tool_name.as_deref() == Some("Bash") {
         if let Some(command) = input.tool_input.get("command").and_then(|v| v.as_str()) {
             if let Some(reason) = parry_exfil::detect_exfiltration(command) {
                 return Some(PreToolUseOutput::deny(&reason));
@@ -39,10 +39,12 @@ mod tests {
 
     fn make_bash_input(command: &str) -> HookInput {
         HookInput {
-            tool_name: "Bash".to_string(),
+            tool_name: Some("Bash".to_string()),
             tool_input: serde_json::json!({ "command": command }),
             tool_response: None,
             session_id: None,
+            hook_event_name: None,
+            cwd: None,
         }
     }
 
@@ -71,10 +73,12 @@ mod tests {
         let dir = tempfile::tempdir().unwrap();
         let _guard = EnvGuard::new(dir.path());
         let input = HookInput {
-            tool_name: "Bash".to_string(),
+            tool_name: Some("Bash".to_string()),
             tool_input: serde_json::json!({}),
             tool_response: None,
             session_id: None,
+            hook_event_name: None,
+            cwd: None,
         };
         let result = process(&input);
         assert!(result.is_none(), "missing command field should pass");
@@ -97,10 +101,12 @@ mod tests {
             ("mcp__custom__tool", serde_json::json!({})),
         ] {
             let input = HookInput {
-                tool_name: tool.to_string(),
+                tool_name: Some(tool.to_string()),
                 tool_input: input_json,
                 tool_response: None,
                 session_id: None,
+                hook_event_name: None,
+                cwd: None,
             };
             let result = process(&input);
             assert!(result.is_some(), "tainted project should block {tool}");
