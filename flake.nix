@@ -27,6 +27,8 @@
             fenix.packages.${system}.stable.toolchain;
         });
   in {
+    homeManagerModules.default = import ./nix/hm-module.nix;
+
     packages = forAllSystems ({
       pkgs,
       craneLib,

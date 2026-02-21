@@ -3,7 +3,7 @@ default:
     @just --list
 
 # Run all checks
-check: clippy test check-fmt lint-toml check-typos lint-actions
+check: clippy test check-fmt lint-toml check-typos lint-actions audit
 
 # Format all
 fmt: fmt-rust fmt-toml
@@ -47,6 +47,10 @@ check-typos:
 # Lint GitHub Actions
 lint-actions:
     actionlint
+
+# Audit dependencies for vulnerabilities
+audit:
+    cargo audit
 
 # Run scan on stdin
 scan:
