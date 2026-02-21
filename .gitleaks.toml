@@ -1,0 +1,4 @@
+[allowlist]
+paths = [
+  '''crates/core/src/secrets\.rs''',
+]
