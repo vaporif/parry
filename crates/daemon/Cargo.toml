@@ -16,6 +16,7 @@ interprocess.workspace = true
 tokio.workspace = true
 tokio-util.workspace = true
 tracing.workspace = true
+redb.workspace = true
 
 [features]
 default = ["candle"]
@@ -23,6 +24,9 @@ onnx = ["parry-ml/onnx"]
 onnx-fetch = ["parry-ml/onnx-fetch"]
 onnx-coreml = ["parry-ml/onnx-coreml"]
 candle = ["parry-ml/candle"]
+
+[dev-dependencies]
+tempfile.workspace = true
 
 [lints]
 workspace = true

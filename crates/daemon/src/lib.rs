@@ -5,6 +5,7 @@
 
 pub mod client;
 pub mod protocol;
+pub mod scan_cache;
 pub mod server;
 pub mod transport;
 

@@ -22,7 +22,6 @@ candle-core = { workspace = true, optional = true }
 candle-nn = { workspace = true, optional = true }
 candle-transformers = { workspace = true, optional = true }
 serde_json.workspace = true
-serde.workspace = true
 
 [features]
 default = ["candle"]

@@ -1,5 +1,6 @@
 //! Async daemon server.
 
+use std::sync::Arc;
 use std::time::Duration;
 
 use futures_util::{SinkExt, StreamExt};
@@ -12,6 +13,7 @@ use parry_core::{Config, ScanResult};
 use parry_ml::MlScanner;
 
 use crate::protocol::{DaemonCodec, ScanRequest, ScanResponse, ScanType};
+use crate::scan_cache::{self, ScanCache};
 use crate::transport;
 
 pub struct DaemonConfig {
@@ -36,13 +38,20 @@ pub async fn run(config: &Config, daemon_config: &DaemonConfig) -> eyre::Result<
     std::fs::write(&pid_path, std::process::id().to_string())?;
 
     let mut ml_scanner = load_ml_scanner(config);
+    let cache = ScanCache::open().map(Arc::new);
 
     let ml_status = if ml_scanner.is_some() {
         "loaded"
     } else {
         "unavailable"
     };
-    info!(pid = std::process::id(), ml = ml_status, "daemon started");
+    let cache_status = if cache.is_some() { "loaded" } else { "off" };
+    info!(pid = std::process::id(), ml = ml_status, cache = cache_status, "daemon started");
+
+    if let Some(ref c) = cache {
+        let c = Arc::clone(c);
+        tokio::spawn(async move { scan_cache::prune_task(&c).await });
+    }
 
     let idle_timeout = daemon_config.idle_timeout;
     let mut deadline = Instant::now() + idle_timeout;
@@ -53,7 +62,7 @@ pub async fn run(config: &Config, daemon_config: &DaemonConfig) -> eyre::Result<
                 match result {
                     Ok(stream) => {
                         debug!("accepted connection");
-                        handle_connection(stream, &mut ml_scanner).await;
+                        handle_connection(stream, &mut ml_scanner, cache.as_deref()).await;
                         deadline = Instant::now() + idle_timeout;
                     }
                     Err(e) => {
@@ -91,6 +100,7 @@ fn load_ml_scanner(config: &Config) -> Option<MlScanner> {
 async fn handle_connection(
     stream: interprocess::local_socket::tokio::Stream,
     ml_scanner: &mut Option<MlScanner>,
+    cache: Option<&ScanCache>,
 ) {
     let mut framed = Framed::new(stream, DaemonCodec);
 
@@ -98,11 +108,15 @@ async fn handle_connection(
         return;
     };
 
-    let resp = handle_request(&req, ml_scanner);
+    let resp = handle_request(&req, ml_scanner, cache);
     let _ = framed.send(resp).await;
 }
 
-fn handle_request(req: &ScanRequest, ml_scanner: &mut Option<MlScanner>) -> ScanResponse {
+fn handle_request(
+    req: &ScanRequest,
+    ml_scanner: &mut Option<MlScanner>,
+    cache: Option<&ScanCache>,
+) -> ScanResponse {
     debug!(scan_type = ?req.scan_type, text_len = req.text.len(), "handling request");
     match req.scan_type {
         ScanType::Ping => ScanResponse::Pong,
@@ -112,31 +126,56 @@ fn handle_request(req: &ScanRequest, ml_scanner: &mut Option<MlScanner>) -> Scan
             scan_result_to_response(result)
         }
         ScanType::Full => {
-            let fast = parry_core::scan_text_fast(&req.text);
-            if !fast.is_clean() {
-                debug!(?fast, "fast scan detected issue");
-                return scan_result_to_response(fast);
-            }
+            if let Some(c) = cache {
+                let hash = scan_cache::hash_content(&req.text);
 
-            if let Some(scanner) = ml_scanner {
-                let stripped = parry_core::unicode::strip_invisible(&req.text);
-                match scanner.scan_chunked(&stripped) {
-                    Ok(false) => {
-                        debug!("ML scan clean");
-                    }
-                    Ok(true) => {
-                        debug!("ML scan detected injection");
-                        return ScanResponse::Injection;
-                    }
-                    Err(e) => {
-                        warn!(%e, "ML scan error, treating as injection (fail-closed)");
-                        return ScanResponse::Injection;
-                    }
+                if let Some(cached) = c.get(hash) {
+                    debug!(?cached, "cache hit");
+                    return scan_result_to_response(cached);
                 }
-            }
 
-            ScanResponse::Clean
+                let result = run_full_scan(&req.text, ml_scanner);
+                c.put(hash, response_to_result(result));
+                result
+            } else {
+                run_full_scan(&req.text, ml_scanner)
+            }
         }
+    }
+}
+
+fn run_full_scan(text: &str, ml_scanner: &mut Option<MlScanner>) -> ScanResponse {
+    let fast = parry_core::scan_text_fast(text);
+    if !fast.is_clean() {
+        debug!(?fast, "fast scan detected issue");
+        return scan_result_to_response(fast);
+    }
+
+    if let Some(scanner) = ml_scanner {
+        let stripped = parry_core::unicode::strip_invisible(text);
+        match scanner.scan_chunked(&stripped) {
+            Ok(false) => {
+                debug!("ML scan clean");
+            }
+            Ok(true) => {
+                debug!("ML scan detected injection");
+                return ScanResponse::Injection;
+            }
+            Err(e) => {
+                warn!(%e, "ML scan error, treating as injection (fail-closed)");
+                return ScanResponse::Injection;
+            }
+        }
+    }
+
+    ScanResponse::Clean
+}
+
+const fn response_to_result(resp: ScanResponse) -> ScanResult {
+    match resp {
+        ScanResponse::Injection => ScanResult::Injection,
+        ScanResponse::Secret => ScanResult::Secret,
+        ScanResponse::Clean | ScanResponse::Pong => ScanResult::Clean,
     }
 }
 

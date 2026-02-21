@@ -9,7 +9,7 @@ pub mod taint;
 
 use parry_core::{Config, ScanError, ScanResult};
 use serde::{Deserialize, Serialize};
-use tracing::{debug, instrument};
+use tracing::instrument;
 
 #[derive(Debug, Deserialize)]
 pub struct HookInput {
@@ -85,12 +85,10 @@ impl PreToolUseOutput {
 pub fn scan_text(text: &str, config: &Config) -> Result<ScanResult, ScanError> {
     let fast = parry_core::scan_text_fast(text);
     if !fast.is_clean() {
-        debug!(?fast, "fast scan detected issue");
         return Ok(fast);
     }
 
     parry_daemon::ensure_running(config)?;
-
     parry_daemon::try_scan_full(text, config).ok_or(ScanError::DaemonConnection)
 }
 

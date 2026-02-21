@@ -13,7 +13,6 @@ path = "src/main.rs"
 [dependencies]
 parry-core.workspace = true
 parry-ml.workspace = true
-parry-exfil.workspace = true
 parry-daemon.workspace = true
 parry-hook.workspace = true
 clap.workspace = true

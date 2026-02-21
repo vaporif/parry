@@ -10,10 +10,9 @@ repository.workspace = true
 parry-core.workspace = true
 parry-exfil.workspace = true
 parry-daemon.workspace = true
-eyre.workspace = true
+redb.workspace = true
 serde.workspace = true
 serde_json.workspace = true
-redb.workspace = true
 tracing.workspace = true
 
 [features]

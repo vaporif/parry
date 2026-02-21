@@ -1769,7 +1769,6 @@ dependencies = [
  "clap",
  "parry-core",
  "parry-daemon",
- "parry-exfil",
  "parry-hook",
  "parry-ml",
  "serde_json",
@@ -1809,6 +1808,8 @@ dependencies = [
  "interprocess",
  "parry-core",
  "parry-ml",
+ "redb",
+ "tempfile",
  "tokio",
  "tokio-util",
  "tracing",
@@ -1845,7 +1846,6 @@ dependencies = [
 name = "parry-hook"
 version = "0.1.0"
 dependencies = [
- "eyre",
  "parry-core",
  "parry-daemon",
  "parry-exfil",
@@ -1868,7 +1868,6 @@ dependencies = [
  "ndarray",
  "ort",
  "parry-core",
- "serde",
  "serde_json",
  "tokenizers",
  "tracing",
