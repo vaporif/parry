@@ -1,4 +1,4 @@
-//! Candle ML backend - pure Rust, no native dependencies.
+//! Candle ML backend
 
 use candle_core::{Device, Tensor};
 use candle_nn::VarBuilder;
