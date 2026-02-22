@@ -8,8 +8,11 @@ use tracing::{debug, info, trace};
 use crate::protocol::{self, ScanRequest, ScanResponse, ScanType};
 use crate::transport::Stream;
 
-/// Connection timeout for daemon IPC.
-const CONNECT_TIMEOUT: Duration = Duration::from_millis(50);
+/// Timeout for ping/liveness checks (must be fast).
+const PING_TIMEOUT: Duration = Duration::from_millis(50);
+
+/// Timeout for scan requests (model loading on first call can take tens of seconds).
+const SCAN_TIMEOUT: Duration = Duration::from_secs(120);
 
 /// Run a full scan (with ML) via the daemon.
 ///
@@ -30,7 +33,7 @@ pub fn scan_full(text: &str, config: &Config) -> Result<ScanResult, ScanError> {
 #[must_use]
 pub fn is_daemon_running() -> bool {
     trace!("checking if daemon is running");
-    let Ok(mut stream) = Stream::connect(CONNECT_TIMEOUT) else {
+    let Ok(mut stream) = Stream::connect(PING_TIMEOUT) else {
         trace!("daemon not running (connection failed)");
         return false;
     };
@@ -106,7 +109,7 @@ pub fn ensure_running(config: &Config) -> Result<(), ScanError> {
 }
 
 fn send_request(req: &ScanRequest) -> Result<ScanResult, ScanError> {
-    let mut stream = Stream::connect(CONNECT_TIMEOUT)?;
+    let mut stream = Stream::connect(SCAN_TIMEOUT)?;
     protocol::write_request(&mut stream, req)?;
     let resp = protocol::read_response(&mut stream)?;
     Ok(response_to_scan_result(resp))
