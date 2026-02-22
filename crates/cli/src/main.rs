@@ -101,7 +101,7 @@ fn run_hook(config: &Config) -> ExitCode {
     } else {
         let tool = hook_input.tool_name.as_deref().unwrap_or("unknown");
         debug!(tool, "detected PreToolUse hook");
-        if let Some(output) = parry_hook::pre_tool_use::process(&hook_input) {
+        if let Some(output) = parry_hook::pre_tool_use::process(&hook_input, config) {
             info!(tool, "tool blocked by PreToolUse");
             // Exit 2 + stderr blocks tool execution in Claude Code
             eprintln!("{}", output.reason());
