@@ -20,7 +20,7 @@ pub struct DaemonConfig {
     pub idle_timeout: Duration,
 }
 
-/// Run the daemon server. Loads the ML model once and serves scan requests.
+/// Run the daemon server. ML model loads lazily on first scan request.
 ///
 /// # Errors
 ///
@@ -37,20 +37,16 @@ pub async fn run(config: &Config, daemon_config: &DaemonConfig) -> eyre::Result<
     let pid_path = transport::pid_file_path()?;
     std::fs::write(&pid_path, std::process::id().to_string())?;
 
-    let mut ml_scanner = load_ml_scanner(config);
+    // ML model loads lazily on first scan request so Pings work immediately
+    let mut ml_scanner: Option<MlScanner> = None;
+    let mut ml_loaded = false;
     let cache = ScanCache::open().map(Arc::new);
 
-    let ml_status = if ml_scanner.is_some() {
-        "loaded"
-    } else {
-        "unavailable"
-    };
     let cache_status = if cache.is_some() { "loaded" } else { "off" };
     info!(
         pid = std::process::id(),
-        ml = ml_status,
         cache = cache_status,
-        "daemon started"
+        "daemon started, ML loads on first scan"
     );
 
     if let Some(ref c) = cache {
@@ -67,7 +63,7 @@ pub async fn run(config: &Config, daemon_config: &DaemonConfig) -> eyre::Result<
                 match result {
                     Ok(stream) => {
                         debug!("accepted connection");
-                        handle_connection(stream, &mut ml_scanner, cache.as_deref()).await;
+                        handle_connection(stream, &mut ml_scanner, &mut ml_loaded, config, cache.as_deref()).await;
                         deadline = Instant::now() + idle_timeout;
                     }
                     Err(e) => {
@@ -105,6 +101,8 @@ fn load_ml_scanner(config: &Config) -> Option<MlScanner> {
 async fn handle_connection(
     stream: interprocess::local_socket::tokio::Stream,
     ml_scanner: &mut Option<MlScanner>,
+    ml_loaded: &mut bool,
+    config: &Config,
     cache: Option<&ScanCache>,
 ) {
     let mut framed = Framed::new(stream, DaemonCodec);
@@ -113,7 +111,18 @@ async fn handle_connection(
         return;
     };
 
-    let resp = handle_request(&req, ml_scanner, cache);
+    let resp = if req.scan_type == ScanType::Ping {
+        ScanResponse::Pong
+    } else {
+        if !*ml_loaded {
+            info!("loading ML model");
+            *ml_scanner = load_ml_scanner(config);
+            *ml_loaded = true;
+            let status = if ml_scanner.is_some() { "loaded" } else { "unavailable" };
+            info!(ml = status, "ML model ready");
+        }
+        handle_request(&req, ml_scanner, cache)
+    };
     let _ = framed.send(resp).await;
 }
 
@@ -122,11 +131,9 @@ fn handle_request(
     ml_scanner: &mut Option<MlScanner>,
     cache: Option<&ScanCache>,
 ) -> ScanResponse {
-    debug!(scan_type = ?req.scan_type, text_len = req.text.len(), "handling request");
-    match req.scan_type {
-        ScanType::Ping => ScanResponse::Pong,
-        ScanType::Full => {
-            if let Some(c) = cache {
+    debug!(text_len = req.text.len(), "handling full scan request");
+    {
+        if let Some(c) = cache {
                 let hash = scan_cache::hash_content(&req.text);
 
                 if let Some(cached) = c.get(hash) {
@@ -140,7 +147,6 @@ fn handle_request(
             } else {
                 run_full_scan(&req.text, ml_scanner)
             }
-        }
     }
 }
 
