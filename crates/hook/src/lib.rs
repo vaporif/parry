@@ -87,6 +87,11 @@ impl PreToolUseOutput {
             },
         }
     }
+
+    #[must_use]
+    pub fn reason(&self) -> &str {
+        &self.hook_specific_output.permission_decision_reason
+    }
 }
 
 /// Run all scans (unicode + substring + secrets + ML) on the given text.

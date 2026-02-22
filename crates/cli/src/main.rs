@@ -103,14 +103,13 @@ fn run_hook(config: &Config) -> ExitCode {
         debug!(tool, "detected PreToolUse hook");
         if let Some(output) = parry_hook::pre_tool_use::process(&hook_input) {
             info!(tool, "tool blocked by PreToolUse");
-            match serde_json::to_string(&output) {
-                Ok(json) => println!("{json}"),
-                Err(e) => warn!(%e, "failed to serialize hook output"),
-            }
+            // Exit 2 + stderr blocks tool execution in Claude Code
+            eprintln!("{}", output.reason());
+            return ExitCode::from(2);
         }
     }
 
-    ExitCode::SUCCESS // hooks always exit clean
+    ExitCode::SUCCESS
 }
 
 fn run_audit(hook_input: &parry_hook::HookInput) {
