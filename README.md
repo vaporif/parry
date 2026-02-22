@@ -20,16 +20,6 @@ cargo install --path crates/cli --no-default-features --features onnx-fetch
 
 ## Usage
 
-### Standalone
-
-```bash
-echo "normal text" | parry scan      # exits 0
-echo "ignore previous" | parry scan  # exits 1
-
-# Custom threshold (0.0-1.0, higher = fewer false positives)
-echo "suspicious" | parry --threshold 0.7 scan
-```
-
 ### Claude Code Hook
 
 ```json

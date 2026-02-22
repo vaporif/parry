@@ -52,45 +52,13 @@ fn main() -> ExitCode {
     };
 
     match cli.command {
-        Some(cli::Command::Hook) => run_hook(&config),
         Some(cli::Command::Serve { idle_timeout }) => run_serve(&config, idle_timeout),
         Some(cli::Command::Diff {
             git_ref,
             extensions,
             full,
         }) => run_diff(&config, &git_ref, extensions.as_deref(), full),
-        Some(cli::Command::Scan) | None => run_scan(&config),
-    }
-}
-
-fn run_scan(config: &Config) -> ExitCode {
-    debug!("starting scan mode");
-    let mut text = String::new();
-    if std::io::stdin().read_to_string(&mut text).is_err() {
-        warn!("failed to read stdin (fail-closed)");
-        return ExitCode::FAILURE;
-    }
-
-    let text = text.trim();
-    if text.is_empty() {
-        debug!("empty input, skipping scan");
-        return ExitCode::SUCCESS;
-    }
-
-    info!(text_len = text.len(), "scanning text");
-    let result = match parry_hook::scan_text(text, config) {
-        Ok(r) => r,
-        Err(e) => {
-            warn!(%e, "scan failed");
-            return ExitCode::FAILURE;
-        }
-    };
-    info!(?result, "scan complete");
-
-    if result.is_clean() {
-        ExitCode::SUCCESS
-    } else {
-        ExitCode::FAILURE
+        Some(cli::Command::Hook) | None => run_hook(&config),
     }
 }
 

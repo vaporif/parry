@@ -65,9 +65,7 @@ fn read_token_file(path: &std::path::Path) -> Option<String> {
 
 #[derive(Subcommand)]
 pub enum Command {
-    /// Read stdin text, exit 1 if injection detected, 0 if clean
-    Scan,
-    /// `PostToolUse` hook mode (JSON stdin → JSON stdout)
+    /// Claude Code hook mode (JSON stdin → JSON stdout)
     Hook,
     /// Run as a daemon with the ML model loaded in memory
     Serve {
