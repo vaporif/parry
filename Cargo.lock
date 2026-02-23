@@ -1773,7 +1773,7 @@ dependencies = [
 
 [[package]]
 name = "parry-ai"
-version = "0.1.0"
+version = "0.1.0-alpha.1"
 dependencies = [
  "clap",
  "fork",
@@ -1789,7 +1789,7 @@ dependencies = [
 
 [[package]]
 name = "parry-core"
-version = "0.1.0"
+version = "0.1.0-alpha.1"
 dependencies = [
  "aho-corasick",
  "data-encoding",
@@ -1810,7 +1810,7 @@ dependencies = [
 
 [[package]]
 name = "parry-daemon"
-version = "0.1.0"
+version = "0.1.0-alpha.1"
 dependencies = [
  "bytes",
  "eyre",
@@ -1827,7 +1827,7 @@ dependencies = [
 
 [[package]]
 name = "parry-exfil"
-version = "0.1.0"
+version = "0.1.0-alpha.1"
 dependencies = [
  "dirs",
  "regex",
@@ -1854,7 +1854,7 @@ dependencies = [
 
 [[package]]
 name = "parry-hook"
-version = "0.1.0"
+version = "0.1.0-alpha.1"
 dependencies = [
  "parry-core",
  "parry-daemon",
@@ -1869,7 +1869,7 @@ dependencies = [
 
 [[package]]
 name = "parry-ml"
-version = "0.1.0"
+version = "0.1.0-alpha.1"
 dependencies = [
  "candle-core",
  "candle-nn",
