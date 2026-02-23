@@ -1772,7 +1772,7 @@ dependencies = [
 ]
 
 [[package]]
-name = "parry"
+name = "parry-ai"
 version = "0.1.0"
 dependencies = [
  "clap",
