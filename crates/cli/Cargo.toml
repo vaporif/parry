@@ -1,5 +1,6 @@
 [package]
 name = "parry-ai"
+default-run = "parry"
 description = "Prompt injection scanner CLI - substring, unicode, secrets, and ML detection"
 version.workspace = true
 edition.workspace = true
