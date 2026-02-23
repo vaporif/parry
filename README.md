@@ -17,7 +17,7 @@ The ML model ([ProtectAI/deberta-v3-small-prompt-injection-v2](https://huggingfa
 ### cargo-binstall
 
 ```bash
-cargo binstall parry
+cargo binstall parry-ai
 ```
 
 ### From source
