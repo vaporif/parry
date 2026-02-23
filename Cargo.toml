@@ -61,7 +61,10 @@ tree-sitter-nix = "0.3"
 tokenizers = { version = "0.22", default-features = false, features = [
   "fancy-regex",
 ] }
-hf-hub = { version = "0.5", features = ["ureq", "rustls-tls"] }
+hf-hub = { version = "0.5", default-features = false, features = [
+  "ureq",
+  "rustls-tls",
+] }
 
 # ONNX backend (optional)
 ort = { version = "2.0.0-rc.11", default-features = false, features = [
