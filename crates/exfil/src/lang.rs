@@ -6,7 +6,8 @@
 use tracing::{debug, trace};
 use tree_sitter::{Language, Parser, Query, QueryCursor, StreamingIterator};
 
-use super::{has_sensitive_path, patterns};
+use crate::patterns;
+use crate::util::{contains_ip_url, has_sensitive_path};
 
 /// Trait for language-specific exfiltration detection.
 pub trait LangExfilDetector: Send + Sync {
@@ -140,22 +141,6 @@ pub fn detect_exfil_in_code<L: LangExfilDetector>(
 
     trace!(interpreter, "no exfil detected");
     None
-}
-
-fn contains_ip_url(text: &str) -> bool {
-    for prefix in &["http://", "https://"] {
-        let mut search = text;
-        while let Some(idx) = search.find(prefix) {
-            let after = &search[idx + prefix.len()..];
-            let authority = after.split('/').next().unwrap_or(after);
-            let host = authority.split(':').next().unwrap_or(authority);
-            if host.parse::<std::net::Ipv4Addr>().is_ok() {
-                return true;
-            }
-            search = &search[idx + prefix.len()..];
-        }
-    }
-    false
 }
 
 #[cfg(test)]
