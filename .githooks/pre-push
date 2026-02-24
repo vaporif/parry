@@ -1,17 +1,5 @@
 #!/usr/bin/env bash
 set -e
 
-# Skip patterns (same as CI paths-ignore)
-skip_pattern='^(\.github/|\.githooks/|\.serena/|.*\.md$|\.gitignore$)'
-
-# Get changed files between HEAD and remote
-changed=$(git diff --name-only @{push}.. 2>/dev/null || git diff --name-only HEAD~1)
-
-# Check if any non-skipped files changed
-if echo "$changed" | grep -vE "$skip_pattern" | grep -q .; then
-    echo "Running lint checks..."
-    just check
-
-else
-    echo "Only docs/config changed, skipping lint and build"
-fi
+echo "Running lint checks..."
+just check
