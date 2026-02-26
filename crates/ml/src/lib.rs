@@ -30,10 +30,15 @@ type Backend = onnx::OnnxBackend;
 /// ML scanner parameterized by backend.
 pub type MlScanner = Scanner<Backend>;
 
-pub struct Scanner<B: MlBackend> {
+struct ModelInstance<B: MlBackend> {
     backend: B,
     tokenizer: Tokenizer,
     threshold: f32,
+    repo: String,
+}
+
+pub struct Scanner<B: MlBackend> {
+    instances: Vec<ModelInstance<B>>,
 }
 
 impl MlScanner {
@@ -41,72 +46,79 @@ impl MlScanner {
     ///
     /// # Errors
     ///
-    /// Returns an error if the model cannot be downloaded or loaded.
+    /// Returns an error if any model cannot be downloaded or loaded.
     #[instrument(skip(config))]
     pub fn load(config: &Config) -> Result<Self> {
-        debug!("loading ML scanner");
-        let repo = model::hf_repo(config)?;
+        let model_defs = config.resolve_models()?;
+        debug!(count = model_defs.len(), "loading ML scanner");
 
-        let tokenizer_path = repo
-            .get("tokenizer.json")
-            .map_err(|e| eyre::eyre!("tokenizer download failed: {e}"))?;
-        let tokenizer = Tokenizer::from_file(&tokenizer_path).map_err(|e| eyre::eyre!(e))?;
-        debug!("tokenizer loaded");
+        let mut instances = Vec::with_capacity(model_defs.len());
+        for def in &model_defs {
+            let repo = model::hf_repo_for(config, &def.repo)?;
 
-        let backend = load_backend(&repo)?;
-        info!("ML backend initialized");
+            let tokenizer_path = repo
+                .get("tokenizer.json")
+                .map_err(|e| eyre::eyre!("tokenizer download failed for {}: {e}", def.repo))?;
+            let tokenizer = Tokenizer::from_file(&tokenizer_path).map_err(|e| eyre::eyre!(e))?;
+            debug!(model = %def.repo, "tokenizer loaded");
 
-        Ok(Self {
-            backend,
-            tokenizer,
-            threshold: config.threshold,
-        })
+            let backend = load_backend(&repo)?;
+            let threshold = def.threshold.unwrap_or(config.threshold);
+            info!(model = %def.repo, threshold, "ML backend initialized");
+
+            instances.push(ModelInstance {
+                backend,
+                tokenizer,
+                threshold,
+                repo: def.repo.clone(),
+            });
+        }
+
+        Ok(Self { instances })
     }
 }
 
 impl<B: MlBackend> Scanner<B> {
-    fn score(&mut self, text: &str) -> Result<f32> {
-        let encoding = self
+    fn score_with(instance: &mut ModelInstance<B>, text: &str) -> Result<f32> {
+        let encoding = instance
             .tokenizer
             .encode(text, true)
             .map_err(|e| eyre::eyre!(e))?;
 
-        let score = self
+        let score = instance
             .backend
             .score(encoding.get_ids(), encoding.get_attention_mask())?;
-        debug!(score, text_len = text.len(), "chunk scored");
+        debug!(score, model = %instance.repo, text_len = text.len(), "chunk scored");
         Ok(score)
     }
 
-    /// Update the detection threshold.
-    pub const fn set_threshold(&mut self, threshold: f32) {
-        self.threshold = threshold;
-    }
-
     /// Scan text using chunked strategy. Returns true if injection detected.
+    /// Uses OR ensemble: any model detecting injection returns true.
     ///
     /// # Errors
     ///
     /// Returns an error if scoring any chunk fails.
-    #[instrument(skip(self, text), fields(text_len = text.len(), threshold = self.threshold))]
+    #[instrument(skip(self, text), fields(text_len = text.len(), models = self.instances.len()))]
     pub fn scan_chunked(&mut self, text: &str) -> Result<bool> {
-        for chunk in chunker::chunks(text) {
-            let score = self.score(chunk)?;
-            if score >= self.threshold {
-                debug!(score, "injection detected in chunk");
-                return Ok(true);
+        for instance in &mut self.instances {
+            for chunk in chunker::chunks(text) {
+                let score = Self::score_with(instance, chunk)?;
+                if score >= instance.threshold {
+                    debug!(score, model = %instance.repo, "injection detected in chunk");
+                    return Ok(true);
+                }
+            }
+
+            if let Some((head_tail, _)) = chunker::head_tail(text) {
+                let score = Self::score_with(instance, &head_tail)?;
+                if score >= instance.threshold {
+                    debug!(score, model = %instance.repo, "injection detected in head+tail");
+                    return Ok(true);
+                }
             }
         }
 
-        if let Some((head_tail, _)) = chunker::head_tail(text) {
-            let score = self.score(&head_tail)?;
-            if score >= self.threshold {
-                debug!(score, "injection detected in head+tail");
-                return Ok(true);
-            }
-        }
-
-        debug!("ML scan clean");
+        debug!("ML scan clean (all models)");
         Ok(false)
     }
 }
@@ -141,19 +153,106 @@ pub(crate) fn softmax_injection_prob(logits: &[f32]) -> f32 {
     let max = logits.iter().copied().fold(f32::NEG_INFINITY, f32::max);
     let exps: Vec<f32> = logits.iter().map(|&l| (l - max).exp()).collect();
     let sum: f32 = exps.iter().sum();
-    exps[1] / sum // label 1 = INJECTION
+    // 1 - P(safe) handles both 2-class and 3+ class models where label 0 is "safe"
+    1.0 - exps[0] / sum
 }
 
 #[cfg(test)]
 mod tests {
     use super::*;
 
+    struct MockBackend {
+        score: f32,
+    }
+
+    impl MlBackend for MockBackend {
+        fn score(&mut self, _input_ids: &[u32], _attention_mask: &[u32]) -> Result<f32> {
+            Ok(self.score)
+        }
+    }
+
+    fn mock_instance(score: f32, threshold: f32, repo: &str) -> ModelInstance<MockBackend> {
+        let tokenizer = Tokenizer::from_bytes(
+            br###"{
+            "version": "1.0",
+            "model": {
+                "type": "WordPiece",
+                "unk_token": "[UNK]",
+                "continuing_subword_prefix": "##",
+                "max_input_chars_per_word": 100,
+                "vocab": {"[UNK]": 0}
+            }
+        }"###,
+        )
+        .expect("minimal tokenizer");
+        ModelInstance {
+            backend: MockBackend { score },
+            tokenizer,
+            threshold,
+            repo: repo.to_string(),
+        }
+    }
+
+    #[test]
+    fn ensemble_or_both_clean() {
+        let mut scanner = Scanner {
+            instances: vec![
+                mock_instance(0.1, 0.5, "model-a"),
+                mock_instance(0.2, 0.5, "model-b"),
+            ],
+        };
+        assert!(!scanner.scan_chunked("hello").unwrap());
+    }
+
+    #[test]
+    fn ensemble_or_first_detects() {
+        let mut scanner = Scanner {
+            instances: vec![
+                mock_instance(0.9, 0.5, "model-a"),
+                mock_instance(0.1, 0.5, "model-b"),
+            ],
+        };
+        assert!(scanner.scan_chunked("hello").unwrap());
+    }
+
+    #[test]
+    fn ensemble_or_second_detects() {
+        let mut scanner = Scanner {
+            instances: vec![
+                mock_instance(0.1, 0.5, "model-a"),
+                mock_instance(0.9, 0.5, "model-b"),
+            ],
+        };
+        assert!(scanner.scan_chunked("hello").unwrap());
+    }
+
+    #[test]
+    fn ensemble_per_model_threshold() {
+        let mut scanner = Scanner {
+            instances: vec![mock_instance(0.6, 0.5, "model-a")],
+        };
+        assert!(scanner.scan_chunked("hello").unwrap());
+
+        let mut scanner = Scanner {
+            instances: vec![mock_instance(0.6, 0.7, "model-b")],
+        };
+        assert!(!scanner.scan_chunked("hello").unwrap());
+    }
+
+    #[test]
+    fn ensemble_single_model() {
+        let mut scanner = Scanner {
+            instances: vec![mock_instance(0.1, 0.5, "only-model")],
+        };
+        assert!(!scanner.scan_chunked("hello").unwrap());
+    }
+
     #[test]
     fn softmax_basic() {
         let logits = [2.0, 1.0];
         let prob = softmax_injection_prob(&logits);
         assert!(prob > 0.0 && prob < 1.0);
-        assert!(prob < 0.5); // logit[0] > logit[1] means injection prob < 0.5
+        assert!(prob < 0.5);
     }
 
     #[test]
@@ -161,5 +260,28 @@ mod tests {
         let logits = [0.0, 5.0];
         let prob = softmax_injection_prob(&logits);
         assert!(prob > 0.9);
+    }
+
+    #[test]
+    fn softmax_three_class() {
+        let logits = [0.0, 5.0, 3.0];
+        let prob = softmax_injection_prob(&logits);
+        assert!(prob > 0.9);
+
+        let logits = [5.0, 0.0, 0.0];
+        let prob = softmax_injection_prob(&logits);
+        assert!(prob < 0.1);
+    }
+
+    #[test]
+    fn softmax_two_class_equivalence() {
+        // For 2-class, 1 - exps[0]/sum == exps[1]/sum
+        let logits = [1.5, 3.2];
+        let prob = softmax_injection_prob(&logits);
+        let max = logits.iter().copied().fold(f32::NEG_INFINITY, f32::max);
+        let exps: Vec<f32> = logits.iter().map(|&l| (l - max).exp()).collect();
+        let sum: f32 = exps.iter().sum();
+        let old_way = exps[1] / sum;
+        assert!((prob - old_way).abs() < 1e-6);
     }
 }

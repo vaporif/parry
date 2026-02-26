@@ -1,6 +1,7 @@
 //! CLI argument parsing.
 
 use clap::{Parser, Subcommand};
+use parry_core::config::ScanMode;
 use std::path::PathBuf;
 
 fn threshold_in_range(s: &str) -> Result<f32, String> {
@@ -9,6 +10,17 @@ fn threshold_in_range(s: &str) -> Result<f32, String> {
         Ok(val)
     } else {
         Err(format!("threshold must be between 0.0 and 1.0, got {val}"))
+    }
+}
+
+fn parse_scan_mode(s: &str) -> Result<ScanMode, String> {
+    match s.to_ascii_lowercase().as_str() {
+        "fast" => Ok(ScanMode::Fast),
+        "full" => Ok(ScanMode::Full),
+        "custom" => Ok(ScanMode::Custom),
+        other => Err(format!(
+            "invalid scan mode '{other}', expected: fast, full, custom"
+        )),
     }
 }
 
@@ -27,6 +39,11 @@ pub struct Cli {
     #[arg(long, env = "PARRY_THRESHOLD", default_value = "0.7",
           value_parser = threshold_in_range)]
     pub threshold: f32,
+
+    /// ML scan mode: fast (1 model), full (2-model ensemble), custom (models.toml)
+    #[arg(long, env = "PARRY_SCAN_MODE", default_value = "fast",
+          value_parser = parse_scan_mode)]
+    pub scan_mode: ScanMode,
 
     /// Paths to ignore (skip all scanning). Repeatable.
     #[arg(long, env = "PARRY_IGNORE_PATHS", value_delimiter = ',')]
@@ -89,4 +106,24 @@ pub enum Command {
         #[arg(long)]
         full: bool,
     },
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn parse_scan_mode_valid() {
+        assert_eq!(parse_scan_mode("fast").unwrap(), ScanMode::Fast);
+        assert_eq!(parse_scan_mode("full").unwrap(), ScanMode::Full);
+        assert_eq!(parse_scan_mode("custom").unwrap(), ScanMode::Custom);
+        assert_eq!(parse_scan_mode("FAST").unwrap(), ScanMode::Fast);
+        assert_eq!(parse_scan_mode("Full").unwrap(), ScanMode::Full);
+    }
+
+    #[test]
+    fn parse_scan_mode_invalid() {
+        assert!(parse_scan_mode("turbo").is_err());
+        assert!(parse_scan_mode("").is_err());
+    }
 }

@@ -13,13 +13,29 @@ use tracing_subscriber::{fmt, EnvFilter};
 fn init_tracing() {
     let filter = EnvFilter::try_from_env("PARRY_LOG").unwrap_or_else(|_| EnvFilter::new("warn"));
 
-    let log_file = parry_daemon::transport::parry_dir().and_then(|dir| {
-        std::fs::create_dir_all(&dir)?;
-        std::fs::OpenOptions::new()
-            .create(true)
-            .append(true)
-            .open(dir.join("parry.log"))
-    });
+    let log_file = std::env::var("PARRY_LOG_FILE")
+        .ok()
+        .map(std::path::PathBuf::from)
+        .map_or_else(
+            || {
+                parry_daemon::transport::parry_dir().and_then(|dir| {
+                    std::fs::create_dir_all(&dir)?;
+                    std::fs::OpenOptions::new()
+                        .create(true)
+                        .append(true)
+                        .open(dir.join("parry.log"))
+                })
+            },
+            |path| {
+                if let Some(parent) = path.parent() {
+                    let _ = std::fs::create_dir_all(parent);
+                }
+                std::fs::OpenOptions::new()
+                    .create(true)
+                    .append(true)
+                    .open(path)
+            },
+        );
 
     match log_file {
         Ok(file) => {
@@ -50,6 +66,7 @@ fn main() -> ExitCode {
         hf_token: cli.resolve_hf_token(),
         threshold: cli.threshold,
         ignore_paths: cli.ignore_path,
+        scan_mode: cli.scan_mode,
     };
 
     match cli.command {

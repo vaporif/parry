@@ -6,11 +6,12 @@ Prompt injection scanner for Claude Code hooks. Scans tool inputs and outputs fo
 
 ## Prerequisites
 
-The ML model ([ProtectAI/deberta-v3-small-prompt-injection-v2](https://huggingface.co/ProtectAI/deberta-v3-small-prompt-injection-v2)) is gated. Before installing:
+The ML models are gated on HuggingFace. Before installing:
 
 1. Create an account at [huggingface.co](https://huggingface.co)
-2. Go to the [model page](https://huggingface.co/ProtectAI/deberta-v3-small-prompt-injection-v2) and accept the license
-3. Create an access token at [huggingface.co/settings/tokens](https://huggingface.co/settings/tokens)
+2. Accept the [DeBERTa v3 license](https://huggingface.co/ProtectAI/deberta-v3-small-prompt-injection-v2) (required for all modes)
+3. For `full` mode: also accept the [Llama Prompt Guard 2 license](https://huggingface.co/meta-llama/Llama-Prompt-Guard-2-86M) (Meta approval required)
+4. Create an access token at [huggingface.co/settings/tokens](https://huggingface.co/settings/tokens)
 
 ## Install
 
@@ -125,11 +126,17 @@ code injection
 
 ### 4. ML Classification
 
-DeBERTa v3 transformer for semantic detection.
+DeBERTa v3 transformer for semantic detection. Supports multi-model ensemble via `--scan-mode`:
+
+| Mode | Models | Description |
+|------|--------|-------------|
+| `fast` (default) | DeBERTa v3 | Single model, fastest |
+| `full` | DeBERTa v3 + Llama Prompt Guard 2 | OR ensemble — any model flags → injection |
+| `custom` | User-defined (`~/.config/parry/models.toml`) | See `examples/models.toml` |
 
 - Chunks long text (256 chars, 25 overlap)
 - Head+tail strategy for texts >1024 chars
-- Configurable threshold (default 0.7)
+- Configurable threshold (default 0.7, per-model override in custom mode)
 
 ### 5. Bash Exfiltration
 
@@ -221,10 +228,13 @@ Fail-closed: panics exit 1, ML errors → suspicious, bad input → failure.
 | `HF_TOKEN` / `--hf-token` | n/a | HuggingFace token (direct value) |
 | `HF_TOKEN_PATH` / `--hf-token-path` | /run/secrets/hf-token-scan-injection | HuggingFace token file |
 | `PARRY_IGNORE_PATHS` / `--ignore-path` | n/a | Paths to skip scanning (comma-separated or repeatable flag) |
+| `PARRY_SCAN_MODE` / `--scan-mode` | fast | ML scan mode: `fast` (1 model), `full` (2-model ensemble), `custom` |
 | `PARRY_IDLE_TIMEOUT` | 1800 | Daemon idle timeout in seconds |
 | `PARRY_LOG` | warn | Tracing filter (`trace`, `debug`, `info`, `warn`, `error`) |
+| `PARRY_LOG_FILE` | `~/.parry/parry.log` | Override log file path |
 
 Custom patterns: `~/.config/parry/patterns.toml` (add/remove sensitive paths, exfil domains, secret patterns).
+Custom models: `~/.config/parry/models.toml` (used with `--scan-mode custom`, see `examples/models.toml`).
 
 ## ML Backends
 
@@ -261,7 +271,10 @@ just setup-hooks         # configure git hooks
 - **ML model**: [ProtectAI/deberta-v3-small-prompt-injection-v2](https://huggingface.co/ProtectAI/deberta-v3-small-prompt-injection-v2)
   - Same model used by [LLM Guard](https://github.com/protectai/llm-guard)
 - **Exfil patterns**: Inspired by [GuardDog](https://github.com/DataDog/guarddog) (Datadog's malicious package scanner)
+- **Full scan mode** optionally uses [Llama Prompt Guard 2 86M](https://huggingface.co/meta-llama/Llama-Prompt-Guard-2-86M) by Meta, licensed under the [Llama 4 Community License](https://github.com/meta-llama/llama-models/blob/main/models/llama4/LICENSE). Built with Llama.
 
 ## License
 
 MIT
+
+Llama Prompt Guard 2 (used in `full` scan mode) is licensed separately under the Llama 4 Community License. See [LICENSE-LLAMA](LICENSE-LLAMA).
