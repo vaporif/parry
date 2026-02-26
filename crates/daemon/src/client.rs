@@ -68,6 +68,8 @@ pub fn spawn_daemon(config: &Config) -> Result<(), ScanError> {
 
     cmd.arg("--threshold").arg(config.threshold.to_string());
 
+    cmd.arg("--scan-mode").arg(config.scan_mode.as_str());
+
     if let Some(ref token) = config.hf_token {
         let token_file = crate::transport::parry_dir()
             .map_err(|e| ScanError::DaemonStart(format!("failed to resolve parry dir: {e}")))?

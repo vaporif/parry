@@ -167,7 +167,7 @@ impl PatternConfig {
     }
 
     fn default_path() -> Option<std::path::PathBuf> {
-        dirs::config_dir().map(|p| p.join("parry").join("patterns.toml"))
+        dirs::home_dir().map(|p| p.join(".config").join("parry").join("patterns.toml"))
     }
 
     fn load_from_path(path: Option<std::path::PathBuf>) -> Self {
