@@ -77,6 +77,14 @@
     };
   };
 
+  modelEntryToml = m:
+    {inherit (m) repo;}
+    // lib.optionalAttrs (m.threshold != null) {inherit (m) threshold;};
+
+  modelsToml = pkgs.writers.writeTOML "models.toml" {
+    models = map modelEntryToml cfg.models;
+  };
+
   patternsToml = pkgs.writers.writeTOML "patterns.toml" {
     sensitive_paths = {
       add = map (e: {inherit (e) pattern kind;}) cfg.patterns.sensitive_paths.add;
@@ -97,7 +105,10 @@
     ++ lib.optional (cfg.logLevel != null) ''--set PARRY_LOG "${cfg.logLevel}"''
     ++ lib.optional (cfg.hfTokenFile != null) ''--set HF_TOKEN_PATH "${cfg.hfTokenFile}"''
     ++ lib.optional (cfg.idleTimeout != null) ''--set PARRY_IDLE_TIMEOUT "${toString cfg.idleTimeout}"''
-    ++ lib.optional (cfg.ignorePaths != []) ''--set PARRY_IGNORE_PATHS "${lib.concatStringsSep "," cfg.ignorePaths}"'';
+    ++ lib.optional (cfg.ignorePaths != []) ''--set PARRY_IGNORE_PATHS "${lib.concatStringsSep "," cfg.ignorePaths}"''
+    ++ lib.optional (cfg.models != []) ''--set PARRY_SCAN_MODE "custom"''
+    ++ lib.optional (cfg.scanMode != null && cfg.models == []) ''--set PARRY_SCAN_MODE "${cfg.scanMode}"''
+    ++ lib.optional (cfg.logFile != null) ''--set PARRY_LOG_FILE "${cfg.logFile}"'';
 
   wrappedParry =
     if envVars != []
@@ -150,6 +161,36 @@ in {
       description = "Project paths to skip scanning entirely (prefix match).";
     };
 
+    scanMode = mkOption {
+      type = types.nullOr (types.enum ["fast" "full" "custom"]);
+      default = null;
+      description = "ML scan mode. fast = DeBERTa only, full = DeBERTa + Llama ensemble, custom = user models.toml.";
+    };
+
+    models = mkOption {
+      type = types.listOf (types.submodule {
+        options = {
+          repo = mkOption {
+            type = types.str;
+            description = "HuggingFace repo ID.";
+          };
+          threshold = mkOption {
+            type = types.nullOr types.float;
+            default = null;
+            description = "Per-model threshold. Null falls back to global threshold.";
+          };
+        };
+      });
+      default = [];
+      description = "Custom model list. When non-empty, generates ~/.config/parry/models.toml and sets scanMode to custom.";
+    };
+
+    logFile = mkOption {
+      type = types.nullOr types.str;
+      default = null;
+      description = "Override log file path. Null uses the default (~/.parry/parry.log).";
+    };
+
     patterns = mkOption {
       type = types.nullOr patternsType;
       default = null;
@@ -158,12 +199,33 @@ in {
   };
 
   config = mkIf cfg.enable {
+    assertions =
+      map (m: {
+        assertion = builtins.match ".+/.+" m.repo != null;
+        message = "parry: model repo '${m.repo}' must be in 'owner/name' format (e.g. 'ProtectAI/deberta-v3-small-prompt-injection-v2')";
+      })
+      cfg.models
+      ++ [
+        {
+          assertion = cfg.scanMode != "custom" || cfg.models != [];
+          message = "parry: scanMode 'custom' requires at least one entry in 'models'";
+        }
+        {
+          assertion = cfg.models == [] || cfg.scanMode == null || cfg.scanMode == "custom";
+          message = "parry: 'models' is set but scanMode is '${toString cfg.scanMode}' (models are only used in 'custom' mode)";
+        }
+      ];
+
     home.packages = [wrappedParry];
 
     home.activation.parryRestart = lib.hm.dag.entryAfter ["writeBoundary"] ''
       ${pkgs.procps}/bin/pkill -x parry 2>/dev/null || true
       rm -f "$HOME/.parry/parry.sock" "$HOME/.parry/daemon.pid" 2>/dev/null || true
     '';
+
+    xdg.configFile."parry/models.toml" = mkIf (cfg.models != []) {
+      source = modelsToml;
+    };
 
     xdg.configFile."parry/patterns.toml" = mkIf (cfg.patterns != null) {
       source = patternsToml;
