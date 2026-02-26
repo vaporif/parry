@@ -3,10 +3,13 @@ members = ["crates/*"]
 resolver = "2"
 
 [workspace.package]
-version = "0.1.0-alpha.1"
+version = "0.1.0-alpha.2"
 edition = "2021"
 license = "MIT"
 repository = "https://github.com/vaporif/parry"
+homepage = "https://github.com/vaporif/parry"
+keywords = ["prompt-injection", "security", "scanner", "llm", "claude"]
+categories = ["command-line-utilities", "development-tools"]
 
 [workspace.dependencies]
 # Internal crates

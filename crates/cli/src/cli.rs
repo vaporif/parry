@@ -25,7 +25,7 @@ fn parse_scan_mode(s: &str) -> Result<ScanMode, String> {
 }
 
 #[derive(Parser)]
-#[command(name = "parry", about = "Prompt injection scanner")]
+#[command(name = "parry", about = "Prompt injection scanner", version)]
 pub struct Cli {
     /// `HuggingFace` token (direct value)
     #[arg(long, env = "HF_TOKEN")]
