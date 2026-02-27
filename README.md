@@ -1,4 +1,5 @@
 # Parry
+[![Check](https://github.com/vaporif/parry/actions/workflows/check.yml/badge.svg)](https://github.com/vaporif/parry/actions/workflows/check.yml)
 
 Prompt injection scanner for Claude Code hooks. Scans tool inputs and outputs for injection attacks, secrets, and data exfiltration attempts.
 
