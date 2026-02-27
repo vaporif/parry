@@ -25,6 +25,9 @@ onnx-fetch = ["parry-daemon/onnx-fetch"]
 onnx-coreml = ["parry-daemon/onnx-coreml"]
 candle = ["parry-daemon/candle"]
 
+[package.metadata.docs.rs]
+features = ["candle"]
+
 [dev-dependencies]
 tempfile.workspace = true
 tokio = { workspace = true, features = ["rt-multi-thread"] }

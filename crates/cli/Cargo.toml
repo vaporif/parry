@@ -11,6 +11,9 @@ keywords.workspace = true
 categories.workspace = true
 readme = "../../README.md"
 
+[package.metadata.docs.rs]
+features = ["candle"]
+
 [[bin]]
 name = "parry"
 path = "src/main.rs"

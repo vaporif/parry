@@ -43,5 +43,8 @@ onnx-coreml = ["onnx-fetch", "ort/coreml"]
 # Pure Rust ML backend (no native deps)
 candle = ["dep:candle-core", "dep:candle-nn", "dep:candle-transformers"]
 
+[package.metadata.docs.rs]
+features = ["candle"]
+
 [lints]
 workspace = true

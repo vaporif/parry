@@ -32,5 +32,8 @@ tree-sitter-perl.workspace = true
 tree-sitter-r.workspace = true
 tree-sitter-nix.workspace = true
 
+[package.metadata.docs.rs]
+all-features = true
+
 [lints]
 workspace = true
