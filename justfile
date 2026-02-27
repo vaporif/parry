@@ -3,10 +3,10 @@ default:
     @just --list
 
 # Run all checks
-check: clippy test check-fmt lint-toml check-typos lint-actions
+check: clippy test check-fmt lint-toml check-typos lint-actions check-nix-fmt
 
 # Format all
-fmt: fmt-rust fmt-toml
+fmt: fmt-rust fmt-toml fmt-nix
 
 # Build workspace
 build:
@@ -39,6 +39,14 @@ lint-toml:
 # Format TOML files
 fmt-toml:
     taplo fmt
+
+# Check Nix formatting
+check-nix-fmt:
+    alejandra --check flake.nix nix/
+
+# Format Nix files
+fmt-nix:
+    alejandra flake.nix nix/
 
 # Check for typos
 check-typos:

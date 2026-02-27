@@ -27,6 +27,7 @@
             fenix.packages.${system}.stable.toolchain;
         });
   in {
+    formatter = nixpkgs.lib.genAttrs systems (system: nixpkgs.legacyPackages.${system}.alejandra);
     homeManagerModules.default = import ./nix/hm-module.nix;
 
     packages = forAllSystems ({
