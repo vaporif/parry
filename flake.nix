@@ -11,6 +11,7 @@
   };
 
   outputs = {
+    self,
     nixpkgs,
     fenix,
     crane,
@@ -28,6 +29,11 @@
         });
   in {
     formatter = nixpkgs.lib.genAttrs systems (system: nixpkgs.legacyPackages.${system}.alejandra);
+
+    overlays.default = final: _prev: {
+      parry = self.packages.${final.stdenv.hostPlatform.system}.default;
+    };
+
     homeManagerModules.default = import ./nix/hm-module.nix;
 
     packages = forAllSystems ({
@@ -52,12 +58,6 @@
         license = pkgs.lib.licenses.mit;
         mainProgram = "parry";
       };
-      buildWithFeatures = features:
-        craneLib.buildPackage (commonArgs
-          // {
-            inherit cargoArtifacts meta;
-            cargoExtraArgs = "--no-default-features --features ${features}";
-          });
       onnxSupported = builtins.elem pkgs.stdenv.hostPlatform.system [
         "x86_64-linux"
         "aarch64-linux"

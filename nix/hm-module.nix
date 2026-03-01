@@ -219,7 +219,11 @@ in {
     home.packages = [wrappedParry];
 
     home.activation.parryRestart = lib.hm.dag.entryAfter ["writeBoundary"] ''
-      ${pkgs.procps}/bin/pkill -x parry 2>/dev/null || true
+      ${
+        if pkgs.stdenv.isDarwin
+        then "/usr/bin/pkill"
+        else "${pkgs.procps}/bin/pkill"
+      } -x parry 2>/dev/null || true
       rm -f "$HOME/.parry/parry.sock" "$HOME/.parry/daemon.pid" 2>/dev/null || true
     '';
 
