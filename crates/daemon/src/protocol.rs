@@ -98,6 +98,8 @@ pub enum ScanResponse {
     Injection = 0x01,
     Secret = 0x02,
     Pong = 0x03,
+    /// Daemon could not complete the scan.
+    Error = 0x04,
 }
 
 impl ScanResponse {
@@ -107,6 +109,7 @@ impl ScanResponse {
             0x01 => Ok(Self::Injection),
             0x02 => Ok(Self::Secret),
             0x03 => Ok(Self::Pong),
+            0x04 => Ok(Self::Error),
             _ => Err(io::Error::new(
                 io::ErrorKind::InvalidData,
                 "unknown response",
@@ -224,6 +227,7 @@ mod tests {
             ScanResponse::Injection,
             ScanResponse::Secret,
             ScanResponse::Pong,
+            ScanResponse::Error,
         ] {
             let mut buf = BytesMut::new();
             DaemonCodec.encode(resp, &mut buf).unwrap();

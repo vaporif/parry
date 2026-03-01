@@ -6,4 +6,6 @@ pub enum ScanError {
     DaemonStart(String),
     #[error("daemon IO: {0}")]
     DaemonIo(#[from] std::io::Error),
+    #[error("daemon scan failed")]
+    DaemonScanFailed,
 }
