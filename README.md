@@ -97,6 +97,8 @@ Add to `~/.claude/settings.json`:
 
 The daemon auto-starts on first scan, downloads the model on first run, and idles out after 30 minutes.
 
+> **Note (non-Nix users):** The Nix home-manager module wraps the binary with all config baked in via env vars. Without Nix, set env vars in your shell profile (e.g. `HF_TOKEN`, `PARRY_IGNORE_PATHS`, `PARRY_SCAN_MODE`) — the hook command inherits them. Alternatively, pass flags directly in the hook command: `parry --hf-token-path ~/.hf-token --ignore-path /home/user/safe hook`. See [Config](#config) for all options.
+
 ### What each hook does
 
 - **PreToolUse**: 5-layer security — taint enforcement, CLAUDE.md scanning, exfil blocking, sensitive path blocking, input content injection scanning (Write/Edit/Bash/MCP tools)
