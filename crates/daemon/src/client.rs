@@ -192,11 +192,8 @@ mod tests {
     #[test]
     fn is_daemon_running_returns_false_without_daemon() {
         let dir = tempfile::tempdir().unwrap();
-        unsafe { std::env::set_var("PARRY_RUNTIME_DIR", dir.path()) };
-        // No daemon on this socket path, should return false
-        let result = is_daemon_running();
-        unsafe { std::env::remove_var("PARRY_RUNTIME_DIR") };
-        assert!(!result);
+        let _guard = crate::transport::test_util::EnvGuard::new(dir.path());
+        assert!(!is_daemon_running());
     }
 
     #[test]
@@ -205,7 +202,7 @@ mod tests {
         use std::os::unix::fs::PermissionsExt;
 
         let dir = tempfile::tempdir().unwrap();
-        unsafe { std::env::set_var("PARRY_RUNTIME_DIR", dir.path()) };
+        let _guard = crate::transport::test_util::EnvGuard::new(dir.path());
 
         let config = Config {
             hf_token: Some("test-token".to_string()),
@@ -220,7 +217,5 @@ mod tests {
             let perms = std::fs::metadata(&token_path).unwrap().permissions();
             assert_eq!(perms.mode() & 0o777, 0o600, "token file should be 0600");
         }
-
-        unsafe { std::env::remove_var("PARRY_RUNTIME_DIR") };
     }
 }

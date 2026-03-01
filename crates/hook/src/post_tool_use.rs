@@ -28,10 +28,12 @@ pub fn process(input: &HookInput, config: &Config) -> Option<HookOutput> {
 
     if result.is_injection() {
         debug!("marking tool as tainted");
-        crate::taint::mark(
-            input.tool_name.as_deref().unwrap_or("unknown"),
-            input.session_id.as_deref(),
-        );
+        crate::taint::mark(&crate::taint::TaintContext {
+            tool_name: input.tool_name.as_deref().unwrap_or("unknown"),
+            session_id: input.session_id.as_deref(),
+            tool_input: &input.tool_input,
+            content: Some(&response),
+        });
     }
 
     if let Some(warning) = warning_for_result(result) {

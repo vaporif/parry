@@ -171,24 +171,52 @@ impl Write for Stream {
 }
 
 #[cfg(test)]
+pub(crate) mod test_util {
+    use std::sync::MutexGuard;
+
+    /// Serializes tests that mutate `PARRY_RUNTIME_DIR`.
+    static ENV_MUTEX: std::sync::Mutex<()> = std::sync::Mutex::new(());
+
+    /// RAII guard: sets `PARRY_RUNTIME_DIR`, restores on drop.
+    pub struct EnvGuard<'a> {
+        _lock: MutexGuard<'a, ()>,
+    }
+
+    impl EnvGuard<'_> {
+        pub fn new(dir: &std::path::Path) -> Self {
+            let lock = ENV_MUTEX
+                .lock()
+                .unwrap_or_else(std::sync::PoisonError::into_inner);
+            unsafe { std::env::set_var("PARRY_RUNTIME_DIR", dir) };
+            Self { _lock: lock }
+        }
+    }
+
+    impl Drop for EnvGuard<'_> {
+        fn drop(&mut self) {
+            unsafe { std::env::remove_var("PARRY_RUNTIME_DIR") };
+        }
+    }
+}
+
+#[cfg(test)]
 mod tests {
     use super::*;
+    use crate::transport::test_util::EnvGuard;
 
     #[test]
     fn parry_dir_respects_env_override() {
-        let dir = "/tmp/parry-test-dir";
-        unsafe { std::env::set_var("PARRY_RUNTIME_DIR", dir) };
+        let dir = tempfile::tempdir().unwrap();
+        let _guard = EnvGuard::new(dir.path());
         let result = parry_dir().unwrap();
-        assert_eq!(result, PathBuf::from(dir));
-        unsafe { std::env::remove_var("PARRY_RUNTIME_DIR") };
+        assert_eq!(result, dir.path().to_path_buf());
     }
 
     #[test]
     fn connect_fails_without_listener() {
         let dir = tempfile::tempdir().unwrap();
-        unsafe { std::env::set_var("PARRY_RUNTIME_DIR", dir.path()) };
+        let _guard = EnvGuard::new(dir.path());
         let result = Stream::connect(Duration::from_millis(50));
-        unsafe { std::env::remove_var("PARRY_RUNTIME_DIR") };
         assert!(result.is_err());
     }
 }

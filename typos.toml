@@ -6,8 +6,9 @@ loca = "loca"
 mmaped = "mmaped"
 # Unicode zero-width joiner test strings ("ig\u200Bnore")
 nore = "nore"
-# Multilingual injection phrases (Spanish, German)
+# Multilingual injection phrases (Spanish, German, French)
 ignora = "ignora"
+maintenant = "maintenant"
 alle = "alle"
 als = "als"
 ein = "ein"

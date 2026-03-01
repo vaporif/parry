@@ -219,7 +219,12 @@ mod tests {
     fn tainted_project_blocks_all_tools() {
         let dir = tempfile::tempdir().unwrap();
         let _guard = EnvGuard::new(dir.path());
-        crate::taint::mark("Read", Some("test-session"));
+        crate::taint::mark(&crate::taint::TaintContext {
+            tool_name: "Read",
+            session_id: Some("test-session"),
+            tool_input: &serde_json::json!({}),
+            content: None,
+        });
 
         let config = test_config();
         for (tool, input_json) in [
