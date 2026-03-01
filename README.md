@@ -245,7 +245,7 @@ Benchmarked on Apple Silicon (M-series, release build, CPU inference). The daemo
 
 ### Backend comparison
 
-ONNX is **5-7x faster** than Candle for ML inference. Run `just bench-candle` / `just bench-onnx` to reproduce (requires `HF_TOKEN`).
+ONNX is **5-7x faster** than Candle for ML inference. Benchmarks use [criterion](https://github.com/bheisler/criterion.rs) — run `just bench-candle` / `just bench-onnx` to reproduce (requires `HF_TOKEN`). HTML reports in `target/criterion/`.
 
 | Text | Candle | ONNX | Speedup |
 |---|---|---|---|
