@@ -33,10 +33,10 @@ impl CandleBackend {
             unsafe { VarBuilder::from_mmaped_safetensors(&[safetensors_path], DTYPE, &device)? };
         let vb = vb.set_prefix("deberta");
 
-        let id2label = config.id2label.clone().or(Some(HashMap::from([
-            (0, "SAFE".into()),
-            (1, "INJECTION".into()),
-        ])));
+        let id2label = config
+            .id2label
+            .clone()
+            .or_else(|| Some(HashMap::from([(0, "SAFE".into()), (1, "INJECTION".into())])));
         let model = DebertaV2SeqClassificationModel::load(vb, &config, id2label)?;
 
         Ok(Self { model, device })
