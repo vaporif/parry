@@ -36,6 +36,7 @@
       ...
     }: let
       src = craneLib.cleanCargoSource ./.;
+      onnxruntime-bin = pkgs.callPackage ./nix/onnxruntime.nix {};
       commonArgs = {
         inherit src;
         pname = "parry";
@@ -57,11 +58,35 @@
             inherit cargoArtifacts meta;
             cargoExtraArgs = "--no-default-features --features ${features}";
           });
-    in {
-      default = craneLib.buildPackage (commonArgs // {inherit cargoArtifacts meta;});
-      onnx-fetch = buildWithFeatures "onnx-fetch";
-      onnx = buildWithFeatures "onnx";
-    });
+      onnxSupported = builtins.elem pkgs.stdenv.hostPlatform.system [
+        "x86_64-linux"
+        "aarch64-linux"
+        "aarch64-darwin"
+      ];
+    in
+      {
+        default = craneLib.buildPackage (commonArgs // {inherit cargoArtifacts meta;});
+      }
+      // pkgs.lib.optionalAttrs onnxSupported {
+        onnx = let
+          unwrapped = craneLib.buildPackage (commonArgs
+            // {
+              inherit cargoArtifacts meta;
+              cargoExtraArgs = "--no-default-features --features onnx";
+              ORT_DYLIB_PATH = "${onnxruntime-bin}/lib/libonnxruntime${pkgs.stdenv.hostPlatform.extensions.sharedLibrary}";
+            });
+        in
+          pkgs.symlinkJoin {
+            name = "parry-onnx";
+            paths = [unwrapped];
+            nativeBuildInputs = [pkgs.makeWrapper];
+            postBuild = ''
+              wrapProgram $out/bin/parry \
+                --set ORT_DYLIB_PATH "${onnxruntime-bin}/lib/libonnxruntime${pkgs.stdenv.hostPlatform.extensions.sharedLibrary}"
+            '';
+            inherit meta;
+          };
+      });
 
     devShells = forAllSystems ({
       pkgs,

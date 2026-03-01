@@ -52,8 +52,8 @@ cargo install --path crates/cli --no-default-features --features onnx-fetch
 
   programs.parry = {
     enable = true;
-    package = inputs.parry.packages.${pkgs.system}.default;      # candle (default)
-    # package = inputs.parry.packages.${pkgs.system}.onnx-fetch; # onnx backend
+    package = inputs.parry.packages.${pkgs.system}.default;  # candle (default)
+    # package = inputs.parry.packages.${pkgs.system}.onnx;  # onnx backend (5-7x faster, see Performance)
     hfTokenFile = config.sops.secrets.hf-token.path;
     ignorePaths = [ "/home/user/repos/parry" ];
 
