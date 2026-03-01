@@ -241,7 +241,22 @@ cargo build --no-default-features --features onnx-fetch
 
 ## Performance
 
-Benchmarked on Apple Silicon (release build, Candle backend, CPU inference). The daemon keeps models loaded in memory and caches scan results.
+Benchmarked on Apple Silicon (M-series, release build, CPU inference). The daemon keeps models loaded in memory and caches scan results.
+
+### Backend comparison
+
+ONNX is **5-7x faster** than Candle for ML inference. Run `just bench-candle` / `just bench-onnx` to reproduce (requires `HF_TOKEN`).
+
+| Text | Candle | ONNX | Speedup |
+|---|---|---|---|
+| Short (147 chars, 1 chunk) | ~61ms | ~10ms | **6.3x** |
+| Medium (460 chars, 2 chunks) | ~160ms | ~32ms | **5.0x** |
+| Long (1288 chars, 6 chunks) | ~683ms | ~136ms | **5.0x** |
+| Model load | ~1s | ~580ms | **1.8x** |
+
+> Measured with `fast` mode (DeBERTa v3 only). Llama Prompt Guard 2 does not ship an ONNX export, so `full` mode currently uses Candle for PG2 regardless of backend choice.
+
+### Daemon latency
 
 | Scenario | `fast` mode (DeBERTa only) | `full` mode (DeBERTa + Llama PG2) |
 |---|---|---|
@@ -251,12 +266,12 @@ Benchmarked on Apple Silicon (release build, Candle backend, CPU inference). The
 | Fast-scan short-circuit (regex/substring match) | ~7ms | ~7ms |
 | Cached result (repeated text) | ~8ms | ~8ms |
 
-Per-model inference per chunk:
+### Per-model inference per chunk
 
-| Model | Time per chunk |
-|---|---|
-| DeBERTa v3 | ~50-70ms |
-| Llama Prompt Guard 2 | ~1,500ms |
+| Model | Candle | ONNX |
+|---|---|---|
+| DeBERTa v3 | ~60ms | ~10ms |
+| Llama Prompt Guard 2 | ~1,500ms | N/A (no ONNX export) |
 
 
 ## Development

@@ -46,5 +46,9 @@ candle = ["dep:candle-core", "dep:candle-nn", "dep:candle-transformers"]
 [package.metadata.docs.rs]
 features = ["candle"]
 
+[[bench]]
+name = "inference"
+harness = false
+
 [lints]
 workspace = true
