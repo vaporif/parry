@@ -31,7 +31,7 @@ pub fn process(input: &HookInput, config: &Config) -> Option<HookOutput> {
         crate::taint::mark(&crate::taint::TaintContext {
             tool_name: input.tool_name.as_deref().unwrap_or("unknown"),
             session_id: input.session_id.as_deref(),
-            source: crate::taint::extract_source(&input.tool_input),
+            tool_input: &input.tool_input,
             content: Some(&response),
         });
     }

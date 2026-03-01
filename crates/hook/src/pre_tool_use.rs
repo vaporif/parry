@@ -222,7 +222,7 @@ mod tests {
         crate::taint::mark(&crate::taint::TaintContext {
             tool_name: "Read",
             session_id: Some("test-session"),
-            source: None,
+            tool_input: &serde_json::json!({}),
             content: None,
         });
 
