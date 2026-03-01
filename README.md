@@ -266,10 +266,21 @@ just check               # run all checks (clippy, test, fmt, lint, typos, audit
 just build               # build workspace (candle)
 just build-onnx          # build workspace (onnx-fetch)
 just test                # run tests
+just test-e2e            # run ML e2e tests (requires HF_TOKEN, see below)
 just clippy              # lint
 just fmt                 # format all (rust + toml)
 just setup-hooks         # configure git hooks
 ```
+
+### ML end-to-end tests
+
+The ML e2e tests are `#[ignore]`d by default since they require a HuggingFace token and model downloads. To run them:
+
+```bash
+HF_TOKEN=hf_... just test-e2e
+```
+
+This tests both `fast` (DeBERTa only) and `full` (DeBERTa + Llama PG2) modes with semantic injection prompts and clean text. First run downloads models (~100MB each).
 
 ## Credits
 
