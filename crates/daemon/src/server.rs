@@ -149,7 +149,10 @@ fn handle_request(
             }
 
             let result = run_full_scan(&req.text, ml_scanner);
-            c.put(hash, response_to_result(result));
+            // Don't cache errors — model may load on next daemon restart
+            if result != ScanResponse::Error {
+                c.put(hash, response_to_result(result));
+            }
             result
         } else {
             run_full_scan(&req.text, ml_scanner)
@@ -164,31 +167,34 @@ fn run_full_scan(text: &str, ml_scanner: &mut Option<MlScanner>) -> ScanResponse
         return scan_result_to_response(fast);
     }
 
-    if let Some(scanner) = ml_scanner {
-        let stripped = parry_core::unicode::strip_invisible(text);
-        match scanner.scan_chunked(&stripped) {
-            Ok(false) => {
-                debug!("ML scan clean");
-            }
-            Ok(true) => {
-                debug!("ML scan detected injection");
-                return ScanResponse::Injection;
-            }
-            Err(e) => {
-                warn!(%e, "ML scan error, treating as injection (fail-closed)");
-                return ScanResponse::Injection;
-            }
+    let Some(scanner) = ml_scanner else {
+        debug!("ML model failed to load, scan cannot proceed (fail-closed)");
+        return ScanResponse::Error;
+    };
+
+    let stripped = parry_core::unicode::strip_invisible(text);
+    match scanner.scan_chunked(&stripped) {
+        Ok(false) => {
+            debug!("ML scan clean");
+            ScanResponse::Clean
+        }
+        Ok(true) => {
+            debug!("ML scan detected injection");
+            ScanResponse::Injection
+        }
+        Err(e) => {
+            warn!(%e, "ML scan error, treating as injection (fail-closed)");
+            ScanResponse::Injection
         }
     }
-
-    ScanResponse::Clean
 }
 
-const fn response_to_result(resp: ScanResponse) -> ScanResult {
+fn response_to_result(resp: ScanResponse) -> ScanResult {
     match resp {
         ScanResponse::Injection => ScanResult::Injection,
         ScanResponse::Secret => ScanResult::Secret,
         ScanResponse::Clean | ScanResponse::Pong => ScanResult::Clean,
+        ScanResponse::Error => unreachable!("Error responses must not be cached"),
     }
 }
 

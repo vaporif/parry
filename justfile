@@ -56,6 +56,10 @@ check-typos:
 lint-actions:
     actionlint
 
+# Run ML e2e tests (requires HF_TOKEN)
+test-e2e:
+    cargo test -p parry-daemon --test e2e -- --ignored
+
 # Run scan on stdin
 scan:
     cargo run -- scan

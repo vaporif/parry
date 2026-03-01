@@ -155,11 +155,13 @@ code injection
 
 DeBERTa v3 transformer for semantic detection. Supports multi-model ensemble via `--scan-mode`:
 
-| Mode | Models | Description |
-|------|--------|-------------|
-| `fast` (default) | DeBERTa v3 | Single model, fastest |
-| `full` | DeBERTa v3 + Llama Prompt Guard 2 | OR ensemble — any model flags → injection |
-| `custom` | User-defined (`~/.config/parry/models.toml`) | See `examples/models.toml` |
+| Mode | Models | Latency per chunk | Description |
+|------|--------|-------------------|-------------|
+| `fast` (default) | DeBERTa v3 | ~50-70ms | Single model, good baseline coverage |
+| `full` | DeBERTa v3 + Llama Prompt Guard 2 | ~1.5s | OR ensemble — catches more attacks, higher latency |
+| `custom` | User-defined (`~/.config/parry/models.toml`) | varies | See `examples/models.toml` |
+
+**When to use `full` mode:** The two models are trained on different datasets and catch different attack patterns. DeBERTa v3 excels at common injection phrases and structural patterns. Llama Prompt Guard 2 is better at subtle, context-dependent attacks (e.g. role-play jailbreaks, indirect prompt injections). Running both as an OR ensemble reduces the chance of an attack slipping through either model's blind spots — at the cost of ~20x higher latency per chunk. Use `fast` for interactive workflows where latency matters; use `full` for high-security environments or when scanning untrusted content in batch (e.g. `parry diff --full`).
 
 - Chunks long text (256 chars, 25 overlap)
 - Head+tail strategy for texts >1024 chars
@@ -237,6 +239,26 @@ One backend is always required (enforced at compile time). Nix builds candle by 
 cargo build --no-default-features --features onnx-fetch
 ```
 
+## Performance
+
+Benchmarked on Apple Silicon (release build, Candle backend, CPU inference). The daemon keeps models loaded in memory and caches scan results.
+
+| Scenario | `fast` mode (DeBERTa only) | `full` mode (DeBERTa + Llama PG2) |
+|---|---|---|
+| Cold start (daemon spawn + model load) | ~370ms | ~2.3s |
+| Warm scan, short text (~120 chars) | ~70ms | ~1.6s |
+| Warm scan, medium text (~280 chars, 2 chunks) | ~130ms | ~3.1s |
+| Fast-scan short-circuit (regex/substring match) | ~7ms | ~7ms |
+| Cached result (repeated text) | ~8ms | ~8ms |
+
+Per-model inference per chunk:
+
+| Model | Time per chunk |
+|---|---|
+| DeBERTa v3 | ~50-70ms |
+| Llama Prompt Guard 2 | ~1,500ms |
+
+
 ## Development
 
 ```bash
@@ -246,10 +268,21 @@ just check               # run all checks (clippy, test, fmt, lint, typos, audit
 just build               # build workspace (candle)
 just build-onnx          # build workspace (onnx-fetch)
 just test                # run tests
+just test-e2e            # run ML e2e tests (requires HF_TOKEN, see below)
 just clippy              # lint
 just fmt                 # format all (rust + toml)
 just setup-hooks         # configure git hooks
 ```
+
+### ML end-to-end tests
+
+The ML e2e tests are `#[ignore]`d by default since they require a HuggingFace token and model downloads. To run them:
+
+```bash
+HF_TOKEN=hf_... just test-e2e
+```
+
+This tests both `fast` (DeBERTa only) and `full` (DeBERTa + Llama PG2) modes with semantic injection prompts and clean text. First run downloads models (~100MB each).
 
 ## Credits
 

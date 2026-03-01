@@ -151,14 +151,18 @@ fn send_request(req: &ScanRequest) -> Result<ScanResult, ScanError> {
     let mut stream = Stream::connect(SCAN_TIMEOUT)?;
     protocol::write_request(&mut stream, req)?;
     let resp = protocol::read_response(&mut stream)?;
-    Ok(response_to_scan_result(resp))
+    match resp {
+        ScanResponse::Error => Err(ScanError::DaemonScanFailed),
+        resp => Ok(response_to_scan_result(resp)),
+    }
 }
 
-const fn response_to_scan_result(resp: ScanResponse) -> ScanResult {
+fn response_to_scan_result(resp: ScanResponse) -> ScanResult {
     match resp {
         ScanResponse::Clean | ScanResponse::Pong => ScanResult::Clean,
         ScanResponse::Injection => ScanResult::Injection,
         ScanResponse::Secret => ScanResult::Secret,
+        ScanResponse::Error => unreachable!("Error handled before conversion"),
     }
 }
 

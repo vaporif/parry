@@ -6,6 +6,8 @@ use candle_transformers::models::debertav2::{
     Config as DebertaV2Config, DebertaV2SeqClassificationModel, DTYPE,
 };
 
+use std::collections::HashMap;
+
 use parry_core::Result;
 
 pub struct CandleBackend {
@@ -31,7 +33,10 @@ impl CandleBackend {
             unsafe { VarBuilder::from_mmaped_safetensors(&[safetensors_path], DTYPE, &device)? };
         let vb = vb.set_prefix("deberta");
 
-        let id2label = config.id2label.clone();
+        let id2label = config
+            .id2label
+            .clone()
+            .or_else(|| Some(HashMap::from([(0, "SAFE".into()), (1, "INJECTION".into())])));
         let model = DebertaV2SeqClassificationModel::load(vb, &config, id2label)?;
 
         Ok(Self { model, device })
