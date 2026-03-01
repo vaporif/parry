@@ -13,6 +13,7 @@ fn fast_config() -> Config {
 fn full_config() -> Config {
     Config {
         scan_mode: ScanMode::Full,
+        hf_token: std::env::var("HF_TOKEN").ok(),
         ..Config::default()
     }
 }
