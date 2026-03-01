@@ -284,6 +284,8 @@ just build               # build workspace (candle)
 just build-onnx          # build workspace (onnx-fetch)
 just test                # run tests
 just test-e2e            # run ML e2e tests (requires HF_TOKEN, see below)
+just bench-candle        # benchmark ML inference, candle backend (requires HF_TOKEN)
+just bench-onnx          # benchmark ML inference, ONNX backend (requires HF_TOKEN)
 just clippy              # lint
 just fmt                 # format all (rust + toml)
 just setup-hooks         # configure git hooks
