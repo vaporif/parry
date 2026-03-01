@@ -237,6 +237,26 @@ One backend is always required (enforced at compile time). Nix builds candle by 
 cargo build --no-default-features --features onnx-fetch
 ```
 
+## Performance
+
+Benchmarked on Apple Silicon (release build, Candle backend, CPU inference). The daemon keeps models loaded in memory and caches scan results.
+
+| Scenario | `fast` mode (DeBERTa only) | `full` mode (DeBERTa + Llama PG2) |
+|---|---|---|
+| Cold start (daemon spawn + model load) | ~370ms | ~2.3s |
+| Warm scan, short text (~120 chars) | ~70ms | ~1.6s |
+| Warm scan, medium text (~280 chars, 2 chunks) | ~130ms | ~3.1s |
+| Fast-scan short-circuit (regex/substring match) | ~7ms | ~7ms |
+| Cached result (repeated text) | ~8ms | ~8ms |
+
+Per-model inference per chunk:
+
+| Model | Time per chunk |
+|---|---|
+| DeBERTa v3 | ~50-70ms |
+| Llama Prompt Guard 2 | ~1,500ms |
+
+
 ## Development
 
 ```bash
