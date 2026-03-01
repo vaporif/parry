@@ -13,14 +13,11 @@ pub struct TaintContext<'a> {
     pub tool_name: &'a str,
     pub session_id: Option<&'a str>,
     pub tool_input: &'a serde_json::Value,
-    /// The content that triggered detection.
     pub content: Option<&'a str>,
 }
 
 impl TaintContext<'_> {
     /// Extract a human-readable source from tool input JSON.
-    ///
-    /// Tries common keys in priority order: `file_path`, `url`, `command`, `path`.
     fn source(&self) -> Option<String> {
         let labels = [
             ("file_path", "file"),
@@ -128,11 +125,8 @@ mod tests {
         let _guard = EnvGuard::new(dir.path());
         mark(&simple_ctx("WebFetch", Some("sess-abc")));
         let ctx = read_context().unwrap();
-        assert!(ctx.contains("WebFetch"), "context should include tool name");
-        assert!(
-            ctx.contains("sess-abc"),
-            "context should include session id"
-        );
+        assert!(ctx.contains("WebFetch"));
+        assert!(ctx.contains("sess-abc"));
     }
 
     #[test]

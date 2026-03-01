@@ -247,6 +247,8 @@ mod tests {
 
     #[test]
     fn clean_text_returns_error_without_daemon() {
+        let dir = tempfile::tempdir().unwrap();
+        let _guard = test_util::EnvGuard::new(dir.path());
         let config = test_config();
         let result = scan_text("Normal markdown content", &config);
         assert!(result.is_err(), "clean text should error without daemon");
