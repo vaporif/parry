@@ -174,10 +174,8 @@ impl Write for Stream {
 pub(crate) mod test_util {
     use std::sync::MutexGuard;
 
-    /// Serializes tests that mutate `PARRY_RUNTIME_DIR`.
     static ENV_MUTEX: std::sync::Mutex<()> = std::sync::Mutex::new(());
 
-    /// RAII guard: sets `PARRY_RUNTIME_DIR`, restores on drop.
     pub struct EnvGuard<'a> {
         _lock: MutexGuard<'a, ()>,
     }
