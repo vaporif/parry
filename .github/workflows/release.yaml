@@ -26,7 +26,7 @@ jobs:
         with:
           bin: parry
           target: ${{ matrix.target }}
-          archive: $bin-$tag-$target
+          archive: $bin-$target-$tag
           checksum: sha256
           token: ${{ secrets.GITHUB_TOKEN }}
           include: README.md,LICENSE
