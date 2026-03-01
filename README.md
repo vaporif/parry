@@ -155,11 +155,13 @@ code injection
 
 DeBERTa v3 transformer for semantic detection. Supports multi-model ensemble via `--scan-mode`:
 
-| Mode | Models | Description |
-|------|--------|-------------|
-| `fast` (default) | DeBERTa v3 | Single model, fastest |
-| `full` | DeBERTa v3 + Llama Prompt Guard 2 | OR ensemble — any model flags → injection |
-| `custom` | User-defined (`~/.config/parry/models.toml`) | See `examples/models.toml` |
+| Mode | Models | Latency per chunk | Description |
+|------|--------|-------------------|-------------|
+| `fast` (default) | DeBERTa v3 | ~50-70ms | Single model, good baseline coverage |
+| `full` | DeBERTa v3 + Llama Prompt Guard 2 | ~1.5s | OR ensemble — catches more attacks, higher latency |
+| `custom` | User-defined (`~/.config/parry/models.toml`) | varies | See `examples/models.toml` |
+
+**When to use `full` mode:** The two models are trained on different datasets and catch different attack patterns. DeBERTa v3 excels at common injection phrases and structural patterns. Llama Prompt Guard 2 is better at subtle, context-dependent attacks (e.g. role-play jailbreaks, indirect prompt injections). Running both as an OR ensemble reduces the chance of an attack slipping through either model's blind spots — at the cost of ~20x higher latency per chunk. Use `fast` for interactive workflows where latency matters; use `full` for high-security environments or when scanning untrusted content in batch (e.g. `parry diff --full`).
 
 - Chunks long text (256 chars, 25 overlap)
 - Head+tail strategy for texts >1024 chars
