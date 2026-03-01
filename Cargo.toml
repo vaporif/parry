@@ -96,6 +96,7 @@ tracing-subscriber = { version = "0.3", features = ["env-filter"] }
 
 # Dev dependencies
 tempfile = "3"
+criterion = { version = "0.5", default-features = false }
 
 [workspace.lints.clippy]
 nursery = { level = "deny", priority = -1 }

@@ -60,6 +60,14 @@ lint-actions:
 test-e2e:
     cargo test -p parry-daemon --test e2e -- --ignored
 
+# Benchmark ML inference with candle backend (requires HF_TOKEN)
+bench-candle:
+    cargo bench -p parry-ml --bench inference
+
+# Benchmark ML inference with ONNX backend (requires HF_TOKEN)
+bench-onnx:
+    cargo bench -p parry-ml --bench inference --no-default-features --features onnx-fetch
+
 # Run scan on stdin
 scan:
     cargo run -- scan
