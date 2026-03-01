@@ -153,7 +153,7 @@ fn send_request(req: &ScanRequest) -> Result<ScanResult, ScanError> {
     let resp = protocol::read_response(&mut stream)?;
     match resp {
         ScanResponse::Error => Err(ScanError::DaemonScanFailed),
-        other => Ok(response_to_scan_result(other)),
+        resp => Ok(response_to_scan_result(resp)),
     }
 }
 
