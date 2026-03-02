@@ -116,6 +116,10 @@ parry serve --idle-timeout 1800  # exits after 30min idle
 
 Hook calls auto-start the daemon if not running (exponential backoff).
 
+### Scan Cache
+
+The daemon caches ML scan results in `~/.parry/scan-cache.redb` (redb). Texts are hashed (u64) and results stored with a 30-day TTL. Cache hits return in ~8ms (vs ~70ms+ for ML inference). Expired entries are pruned hourly. The cache is shared across all projects — identical text always returns the same cached result regardless of which project triggered the scan.
+
 ## Detection Layers
 
 ### 1. Unicode
