@@ -143,7 +143,7 @@ fn handle_request(
         if let Some(c) = cache {
             let hash = scan_cache::hash_content(&req.text);
 
-            if let Some(cached) = c.get(hash) {
+            if let Some(cached) = c.get(&hash) {
                 debug!(?cached, "cache hit");
                 return scan_result_to_response(cached);
             }
@@ -151,7 +151,7 @@ fn handle_request(
             let result = run_full_scan(&req.text, ml_scanner);
             // Don't cache errors — model may load on next daemon restart
             if result != ScanResponse::Error {
-                c.put(hash, response_to_result(result));
+                c.put(&hash, response_to_result(result));
             }
             result
         } else {
