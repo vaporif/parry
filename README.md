@@ -4,7 +4,7 @@
 
 Prompt injection scanner for Claude Code hooks. Scans tool inputs and outputs for injection attacks, secrets, and data exfiltration attempts.
 
-> **Early development** — this tool is under active development and may have bugs. Only tested on macOS.
+> **Early development** — this tool is under active development and may have bugs or false positives. Tested on linux/macOS.
 
 ## Prerequisites
 
