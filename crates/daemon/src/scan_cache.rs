@@ -111,29 +111,26 @@ impl ScanCache {
         let Ok(txn) = self.db.begin_write() else {
             return;
         };
+        let Ok(mut table) = txn.open_table(TABLE) else {
+            return;
+        };
 
-        if let Ok(mut table) = txn.open_table(TABLE) {
-            let now = now_secs();
-            let Ok(iter) = table.iter() else {
-                return;
-            };
-            let expired: Vec<[u8; 32]> = iter
-                .filter_map(|entry| {
-                    let (key, val) = entry.ok()?;
-                    let (_, ts) = val.value();
-                    if now.saturating_sub(ts) > TTL_SECS {
-                        Some(*key.value())
-                    } else {
-                        None
-                    }
-                })
-                .collect();
+        let now = now_secs();
+        let expired: Vec<[u8; 32]> = table
+            .iter()
+            .into_iter()
+            .flatten()
+            .filter_map(|entry| {
+                let (key, val) = entry.ok()?;
+                let (_, ts) = val.value();
+                (now.saturating_sub(ts) > TTL_SECS).then(|| *key.value())
+            })
+            .collect();
 
-            for key in &expired {
-                let _ = table.remove(key);
-            }
+        for key in &expired {
+            let _ = table.remove(key);
         }
-
+        drop(table);
         let _ = txn.commit();
     }
 }

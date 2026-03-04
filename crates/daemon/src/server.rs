@@ -12,6 +12,12 @@ use tracing::{debug, info, instrument, warn};
 use parry_core::{Config, ScanResult};
 use parry_ml::MlScanner;
 
+enum MlState {
+    NotLoaded,
+    Loaded(MlScanner),
+    Failed,
+}
+
 use crate::protocol::{DaemonCodec, ScanRequest, ScanResponse, ScanType};
 use crate::scan_cache::{self, ScanCache};
 use crate::transport;
@@ -40,8 +46,7 @@ pub async fn run(config: &Config, daemon_config: &DaemonConfig) -> eyre::Result<
     std::fs::write(&pid_path, std::process::id().to_string())?;
 
     // ML model loads lazily on first scan request so Pings work immediately
-    let mut ml_scanner: Option<MlScanner> = None;
-    let mut ml_loaded = false;
+    let mut ml_state = MlState::NotLoaded;
     let cache = ScanCache::open().map(Arc::new);
 
     let cache_status = if cache.is_some() { "loaded" } else { "off" };
@@ -65,7 +70,7 @@ pub async fn run(config: &Config, daemon_config: &DaemonConfig) -> eyre::Result<
                 match result {
                     Ok(stream) => {
                         debug!("accepted connection");
-                        handle_connection(stream, &mut ml_scanner, &mut ml_loaded, config, cache.as_deref()).await;
+                        handle_connection(stream, &mut ml_state, config, cache.as_deref()).await;
                         deadline = Instant::now() + idle_timeout;
                     }
                     Err(e) => {
@@ -103,8 +108,7 @@ fn load_ml_scanner(config: &Config) -> Option<MlScanner> {
 
 async fn handle_connection(
     stream: interprocess::local_socket::tokio::Stream,
-    ml_scanner: &mut Option<MlScanner>,
-    ml_loaded: &mut bool,
+    ml_state: &mut MlState,
     config: &Config,
     cache: Option<&ScanCache>,
 ) {
@@ -117,50 +121,55 @@ async fn handle_connection(
     let resp = if req.scan_type == ScanType::Ping {
         ScanResponse::Pong
     } else {
-        if !*ml_loaded {
+        if matches!(ml_state, MlState::NotLoaded) {
             info!("loading ML model");
-            *ml_scanner = load_ml_scanner(config);
-            *ml_loaded = true;
-            let status = if ml_scanner.is_some() {
-                "loaded"
-            } else {
-                "unavailable"
-            };
-            info!(ml = status, "ML model ready");
+            *ml_state = load_ml_scanner(config).map_or_else(
+                || {
+                    info!(ml = "unavailable", "ML model ready");
+                    MlState::Failed
+                },
+                |scanner| {
+                    info!(ml = "loaded", "ML model ready");
+                    MlState::Loaded(scanner)
+                },
+            );
         }
-        handle_request(&req, ml_scanner, cache)
+        let scanner = if let MlState::Loaded(ref mut s) = ml_state {
+            Some(s)
+        } else {
+            None
+        };
+        handle_request(&req, scanner, cache)
     };
     let _ = framed.send(resp).await;
 }
 
 fn handle_request(
     req: &ScanRequest,
-    ml_scanner: &mut Option<MlScanner>,
+    ml_scanner: Option<&mut MlScanner>,
     cache: Option<&ScanCache>,
 ) -> ScanResponse {
     debug!(text_len = req.text.len(), "handling full scan request");
-    {
-        if let Some(c) = cache {
-            let hash = scan_cache::hash_content(&req.text);
+    if let Some(c) = cache {
+        let hash = scan_cache::hash_content(&req.text);
 
-            if let Some(cached) = c.get(&hash) {
-                debug!(?cached, "cache hit");
-                return scan_result_to_response(cached);
-            }
-
-            let result = run_full_scan(&req.text, ml_scanner);
-            // Don't cache errors — model may load on next daemon restart
-            if result != ScanResponse::Error {
-                c.put(&hash, response_to_result(result));
-            }
-            result
-        } else {
-            run_full_scan(&req.text, ml_scanner)
+        if let Some(cached) = c.get(&hash) {
+            debug!(?cached, "cache hit");
+            return scan_result_to_response(cached);
         }
+
+        let result = run_full_scan(&req.text, ml_scanner);
+        // Don't cache errors — model may load on next daemon restart
+        if result != ScanResponse::Error {
+            c.put(&hash, response_to_result(result));
+        }
+        result
+    } else {
+        run_full_scan(&req.text, ml_scanner)
     }
 }
 
-fn run_full_scan(text: &str, ml_scanner: &mut Option<MlScanner>) -> ScanResponse {
+fn run_full_scan(text: &str, ml_scanner: Option<&mut MlScanner>) -> ScanResponse {
     let fast = parry_core::scan_text_fast(text);
     if !fast.is_clean() {
         debug!(?fast, "fast scan detected issue");

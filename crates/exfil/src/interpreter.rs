@@ -168,11 +168,7 @@ pub fn check_shell_inline_code(node: Node, source: &[u8], cmd_name: &str) -> Opt
         if text == "-c" {
             if let Some(&code_node) = children.get(i + 1) {
                 let raw = node_text(code_node, source);
-                let code_str = raw
-                    .strip_prefix('"')
-                    .and_then(|s| s.strip_suffix('"'))
-                    .or_else(|| raw.strip_prefix('\'').and_then(|s| s.strip_suffix('\'')))
-                    .unwrap_or(raw);
+                let code_str = crate::util::strip_quotes(raw);
                 if let Some(inner_reason) = crate::detect_exfiltration(code_str) {
                     return Some(format!(
                         "Shell '{cmd_name} -c' wrapping exfil: {inner_reason}"

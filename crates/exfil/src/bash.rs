@@ -451,11 +451,7 @@ fn check_busybox_shell(node: Node, source: &[u8]) -> Option<String> {
         if text == "-c" {
             if let Some(&code_node) = children.get(i + 1) {
                 let raw = node_text(code_node, source);
-                let code_str = raw
-                    .strip_prefix('"')
-                    .and_then(|s| s.strip_suffix('"'))
-                    .or_else(|| raw.strip_prefix('\'').and_then(|s| s.strip_suffix('\'')))
-                    .unwrap_or(raw);
+                let code_str = crate::util::strip_quotes(raw);
                 if let Some(inner_reason) = crate::detect_exfiltration(code_str) {
                     return Some(format!("Shell 'busybox -c' wrapping exfil: {inner_reason}"));
                 }

@@ -51,7 +51,7 @@ pub fn process(input: &HookInput, config: &Config) -> Option<PreToolUseOutput> {
 
     // Scan tool input content for injection (Write, Edit, NotebookEdit, Bash, MCP tools)
     for content in extract_scannable_content(tool, &input.tool_input) {
-        if let Some(output) = scan_input_content(tool, &content, config) {
+        if let Some(output) = scan_input_content(tool, content, config) {
             return Some(output);
         }
     }
@@ -82,7 +82,7 @@ fn check_sensitive_path(tool: &str, input: &serde_json::Value) -> Option<PreTool
 ///
 /// Returns individual strings to scan. MCP tools return each string separately
 /// so ML sees clean per-value context instead of a concatenated blob.
-fn extract_scannable_content(tool: &str, input: &serde_json::Value) -> Vec<String> {
+fn extract_scannable_content<'a>(tool: &str, input: &'a serde_json::Value) -> Vec<&'a str> {
     match tool {
         "Write" => json_str_to_vec(input, "content"),
         "Edit" => json_str_to_vec(input, "new_string"),
@@ -100,18 +100,18 @@ fn extract_scannable_content(tool: &str, input: &serde_json::Value) -> Vec<Strin
     }
 }
 
-fn json_str_to_vec(input: &serde_json::Value, key: &str) -> Vec<String> {
+fn json_str_to_vec<'a>(input: &'a serde_json::Value, key: &str) -> Vec<&'a str> {
     input
         .get(key)
         .and_then(|v| v.as_str())
-        .map(|s| vec![s.to_owned()])
-        .unwrap_or_default()
+        .into_iter()
+        .collect()
 }
 
 /// Recursively collect all string values from a JSON value.
-fn collect_strings(value: &serde_json::Value, out: &mut Vec<String>) {
+fn collect_strings<'a>(value: &'a serde_json::Value, out: &mut Vec<&'a str>) {
     match value {
-        serde_json::Value::String(s) => out.push(s.clone()),
+        serde_json::Value::String(s) => out.push(s),
         serde_json::Value::Array(arr) => {
             for item in arr {
                 collect_strings(item, out);

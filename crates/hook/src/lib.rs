@@ -29,14 +29,13 @@ impl HookInput {
     /// Check if the current working directory is in the ignore list.
     #[must_use]
     pub fn is_ignored(&self, config: &Config) -> bool {
-        let cwd = self
-            .cwd
-            .clone()
-            .or_else(|| std::env::current_dir().ok()?.to_str().map(String::from));
-        match cwd {
-            Some(ref path) if !path.is_empty() => config.is_ignored(path),
-            _ => false,
+        if let Some(ref cwd) = self.cwd {
+            return !cwd.is_empty() && config.is_ignored(cwd);
         }
+        let Ok(cwd) = std::env::current_dir() else {
+            return false;
+        };
+        cwd.to_str().is_some_and(|p| config.is_ignored(p))
     }
 
     /// Extract tool response as a string.

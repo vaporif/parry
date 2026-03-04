@@ -109,7 +109,7 @@ impl<B: MlBackend> Scanner<B> {
                 }
             }
 
-            if let Some((head_tail, _)) = chunker::head_tail(text) {
+            if let Some(head_tail) = chunker::head_tail(text) {
                 let score = Self::score_with(instance, &head_tail)?;
                 if score >= instance.threshold {
                     debug!(score, model = %instance.repo, "injection detected in head+tail");
