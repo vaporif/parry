@@ -92,12 +92,6 @@ static SECURITY_SUBSTRINGS: LazyLock<AhoCorasick> = LazyLock::new(|| {
             "تجاهل التعليمات السابقة",
             "انس جميع التعليمات",
             "أنت الآن",
-            // -- Malware/attack terms (rarely appear in legitimate code) --
-            "keylogger",
-            "ransomware",
-            "rootkit",
-            "cryptojacking",
-            "botnet",
         ])
         .expect("valid regex")
 });
