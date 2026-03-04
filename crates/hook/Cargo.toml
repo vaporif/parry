@@ -13,6 +13,7 @@ categories.workspace = true
 parry-core.workspace = true
 parry-exfil.workspace = true
 parry-daemon.workspace = true
+blake3.workspace = true
 redb.workspace = true
 serde.workspace = true
 serde_json.workspace = true

@@ -1961,6 +1961,7 @@ dependencies = [
 name = "parry-hook"
 version = "0.1.0-alpha.8"
 dependencies = [
+ "blake3",
  "parry-core",
  "parry-daemon",
  "parry-exfil",

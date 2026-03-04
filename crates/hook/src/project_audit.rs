@@ -5,7 +5,6 @@
 //! - Settings files pre-approving dangerous permissions
 //! - Hook scripts that execute arbitrary code
 
-use std::hash::{DefaultHasher, Hash, Hasher};
 use std::path::{Path, PathBuf};
 
 use tracing::{debug, instrument, warn};
@@ -75,23 +74,31 @@ fn collect_state(dir: &Path) -> AuditState {
 
 /// Hash collected state for cache comparison.
 fn hash_state(state: &AuditState) -> u64 {
-    let mut hasher = DefaultHasher::new();
+    let mut hasher = blake3::Hasher::new();
 
     for (path, content) in &state.commands {
-        path.file_name().hash(&mut hasher);
-        content.hash(&mut hasher);
+        if let Some(name) = path.file_name() {
+            hasher.update(name.as_encoded_bytes());
+        }
+        hasher.update(b"\0");
+        hasher.update(content.as_bytes());
+        hasher.update(b"\0");
     }
 
     for (name, content) in &state.settings {
-        name.hash(&mut hasher);
-        content.hash(&mut hasher);
+        hasher.update(name.as_bytes());
+        hasher.update(b"\0");
+        hasher.update(content.as_bytes());
+        hasher.update(b"\0");
     }
 
     for name in &state.hook_files {
-        name.hash(&mut hasher);
+        hasher.update(name.as_bytes());
+        hasher.update(b"\0");
     }
 
-    hasher.finish()
+    let hash = hasher.finalize();
+    u64::from_le_bytes(hash.as_bytes()[..8].try_into().unwrap())
 }
 
 /// Run project audit on the given directory.

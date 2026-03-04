@@ -33,7 +33,7 @@ pub fn chunks(text: &str) -> Vec<&str> {
 /// Returns a head+tail slice pair for texts longer than 1024 chars.
 /// Catches injection appended at the very end.
 #[must_use]
-pub fn head_tail(text: &str) -> Option<(String, bool)> {
+pub fn head_tail(text: &str) -> Option<String> {
     if text.len() <= HEAD_TAIL_THRESHOLD {
         return None;
     }
@@ -41,7 +41,7 @@ pub fn head_tail(text: &str) -> Option<(String, bool)> {
     let head = &text[..head_end];
     let tail_start = text.floor_char_boundary(text.len().saturating_sub(HEAD_TAIL_SIZE));
     let tail = &text[tail_start..];
-    Some((format!("{head} {tail}"), true))
+    Some(format!("{head} {tail}"))
 }
 
 #[cfg(test)]
@@ -85,9 +85,7 @@ mod tests {
     #[test]
     fn head_tail_some_for_long() {
         let text = "a".repeat(2000);
-        let result = head_tail(&text);
-        assert!(result.is_some());
-        let (combined, _) = result.unwrap();
+        let combined = head_tail(&text).unwrap();
         // head(512) + " " + tail(512) = 1025
         assert_eq!(combined.len(), 1025);
     }
@@ -118,9 +116,7 @@ mod tests {
     fn head_tail_with_multibyte() {
         // Place multi-byte chars around the 512-byte head/tail cut points
         let text = "a".repeat(511) + "ñ" + &"b".repeat(1000) + "🔥" + &"c".repeat(100);
-        let result = head_tail(&text);
-        assert!(result.is_some());
-        let (combined, _) = result.unwrap();
+        let combined = head_tail(&text).unwrap();
         assert!(!combined.is_empty());
     }
 }

@@ -103,32 +103,36 @@ fn run_hook(config: &Config) -> ExitCode {
     };
 
     // Dispatch by event type
-    if hook_input.hook_event_name.as_deref() == Some("UserPromptSubmit") {
-        debug!("detected UserPromptSubmit hook");
-        run_audit(&hook_input);
-    } else if hook_input.tool_response.is_some() {
-        let tool = hook_input.tool_name.as_deref().unwrap_or("unknown");
-        debug!(tool, "detected PostToolUse hook");
-        if let Some(output) = parry_hook::post_tool_use::process(&hook_input, config) {
-            info!(tool, "threat detected in tool output");
-            match serde_json::to_string(&output) {
-                Ok(json) => println!("{json}"),
-                Err(e) => warn!(%e, "failed to serialize hook output"),
+    match hook_input.hook_event_name.as_deref() {
+        Some("UserPromptSubmit") => {
+            debug!("detected UserPromptSubmit hook");
+            run_audit(&hook_input);
+        }
+        Some("PostToolUse") => {
+            let tool = hook_input.tool_name.as_deref().unwrap_or("unknown");
+            debug!(tool, "detected PostToolUse hook");
+            if let Some(output) = parry_hook::post_tool_use::process(&hook_input, config) {
+                info!(tool, "threat detected in tool output");
+                match serde_json::to_string(&output) {
+                    Ok(json) => println!("{json}"),
+                    Err(e) => warn!(%e, "failed to serialize hook output"),
+                }
             }
         }
-    } else {
-        let tool = hook_input.tool_name.as_deref().unwrap_or("unknown");
-        debug!(tool, "detected PreToolUse hook");
-        if let Some(output) = parry_hook::pre_tool_use::process(&hook_input, config) {
-            if output.is_deny() {
-                info!(tool, "tool denied by PreToolUse");
-                eprintln!("{}", output.reason());
-                return ExitCode::from(2);
-            }
-            info!(tool, "tool requires approval (PreToolUse)");
-            match serde_json::to_string(&output) {
-                Ok(json) => println!("{json}"),
-                Err(e) => warn!(%e, "failed to serialize PreToolUse output"),
+        _ => {
+            let tool = hook_input.tool_name.as_deref().unwrap_or("unknown");
+            debug!(tool, "detected PreToolUse hook");
+            if let Some(output) = parry_hook::pre_tool_use::process(&hook_input, config) {
+                if output.is_deny() {
+                    info!(tool, "tool denied by PreToolUse");
+                    eprintln!("{}", output.reason());
+                    return ExitCode::from(2);
+                }
+                info!(tool, "tool requires approval (PreToolUse)");
+                match serde_json::to_string(&output) {
+                    Ok(json) => println!("{json}"),
+                    Err(e) => warn!(%e, "failed to serialize PreToolUse output"),
+                }
             }
         }
     }

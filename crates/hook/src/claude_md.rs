@@ -1,6 +1,5 @@
 //! CLAUDE.md scanning with cache.
 
-use std::hash::{DefaultHasher, Hash, Hasher};
 use std::path::PathBuf;
 
 use parry_core::Config;
@@ -135,9 +134,8 @@ fn claude_md_paths() -> Vec<PathBuf> {
 }
 
 fn hash_content(content: &str) -> u64 {
-    let mut hasher = DefaultHasher::new();
-    content.hash(&mut hasher);
-    hasher.finish()
+    let hash = blake3::hash(content.as_bytes());
+    u64::from_le_bytes(hash.as_bytes()[..8].try_into().unwrap())
 }
 
 #[cfg(test)]

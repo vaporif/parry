@@ -111,10 +111,16 @@ impl Pattern {
             let abs_idx = pos + idx;
             let pattern_end = abs_idx + self.lower.len();
 
-            let at_start =
-                abs_idx == 0 || text.chars().nth(abs_idx - 1).is_some_and(boundary_chars);
+            let at_start = abs_idx == 0
+                || text[..abs_idx]
+                    .chars()
+                    .next_back()
+                    .is_some_and(boundary_chars);
             let at_end = pattern_end >= text.len()
-                || text.chars().nth(pattern_end).is_some_and(boundary_chars);
+                || text[pattern_end..]
+                    .chars()
+                    .next()
+                    .is_some_and(boundary_chars);
 
             if at_start && at_end {
                 return true;

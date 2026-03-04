@@ -68,6 +68,17 @@ pub fn contains_ip_url(text: &str) -> bool {
     false
 }
 
+#[must_use]
+pub fn strip_quotes(s: &str) -> &str {
+    s.strip_prefix('"')
+        .and_then(|inner| inner.strip_suffix('"'))
+        .or_else(|| {
+            s.strip_prefix('\'')
+                .and_then(|inner| inner.strip_suffix('\''))
+        })
+        .unwrap_or(s)
+}
+
 /// Returns true if the IPv4 address is private/loopback (RFC 1918 + loopback).
 pub const fn is_private_ipv4(ip: std::net::Ipv4Addr) -> bool {
     ip.is_loopback() || ip.is_private() || ip.is_link_local()
