@@ -131,7 +131,7 @@ Multi-stage, fail-closed (if unsure, treat as unsafe):
 | `full` | DeBERTa v3 + Llama Prompt Guard 2 | ~1.5s |
 | `custom` | User-defined (`~/.config/parry/models.toml`) | varies |
 
-Use `fast` for interactive workflows; `full` for high-security or batch scanning (`parry diff --full`).
+Use `fast` for interactive workflows; `full` for high-security or batch scanning (`parry diff --full`). The two models cover different blind spots — DeBERTa v3 catches common injection patterns while Llama Prompt Guard 2 is better at subtle, context-dependent attacks (role-play jailbreaks, indirect injections). Running both as an OR ensemble reduces missed attacks at ~20x higher latency per chunk.
 
 ## Config
 
