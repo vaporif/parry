@@ -7,7 +7,10 @@ use parry_daemon::DaemonConfig;
 use tokio::task::JoinHandle;
 
 fn fast_config() -> Config {
-    Config::default()
+    Config {
+        hf_token: std::env::var("HF_TOKEN").ok(),
+        ..Config::default()
+    }
 }
 
 fn full_config() -> Config {
