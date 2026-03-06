@@ -19,6 +19,18 @@ pub struct AuditWarning {
     pub message: String,
 }
 
+/// A single manifest entry describing .claude/ contents.
+pub struct ManifestEntry {
+    pub category: &'static str,
+    pub items: Vec<String>,
+}
+
+/// Combined audit output: manifest (always) + warnings (on detection).
+pub struct AuditResult {
+    pub manifest: Vec<ManifestEntry>,
+    pub warnings: Vec<AuditWarning>,
+}
+
 /// Collected state from `.claude/` directory — read once, used for both hashing and checking.
 struct AuditState {
     /// (path, content) for `.claude/commands/*` files (all types, not just .md).
@@ -144,6 +156,100 @@ fn hash_path_entries(hasher: &mut blake3::Hasher, entries: &[(PathBuf, String)])
         hasher.update(content.as_bytes());
         hasher.update(b"\0");
     }
+}
+
+/// Build manifest entries from collected state.
+fn build_manifest(state: &AuditState) -> Vec<ManifestEntry> {
+    let mut manifest = Vec::new();
+
+    if !state.commands.is_empty() {
+        manifest.push(ManifestEntry {
+            category: "Commands",
+            items: state
+                .commands
+                .iter()
+                .filter_map(|(p, _)| p.file_name().map(|n| n.to_string_lossy().into_owned()))
+                .collect(),
+        });
+    }
+
+    if !state.agents.is_empty() {
+        manifest.push(ManifestEntry {
+            category: "Agents",
+            items: state
+                .agents
+                .iter()
+                .filter_map(|(p, _)| p.file_name().map(|n| n.to_string_lossy().into_owned()))
+                .collect(),
+        });
+    }
+
+    if !state.hooks.is_empty() {
+        manifest.push(ManifestEntry {
+            category: "Hooks",
+            items: state.hooks.iter().map(|(name, _)| name.clone()).collect(),
+        });
+    }
+
+    if !state.settings.is_empty() {
+        manifest.push(ManifestEntry {
+            category: "Settings",
+            items: state
+                .settings
+                .iter()
+                .map(|(name, content)| {
+                    if let Ok(json) = serde_json::from_str::<serde_json::Value>(content) {
+                        if let Some(perms) = json.get("permissions") {
+                            let allow_count = perms
+                                .get("allow")
+                                .and_then(|v| v.as_array())
+                                .map_or(0, Vec::len);
+                            let deny_count = perms
+                                .get("deny")
+                                .and_then(|v| v.as_array())
+                                .map_or(0, Vec::len);
+                            return format!("{name} ({allow_count} allow, {deny_count} deny)");
+                        }
+                    }
+                    (*name).to_string()
+                })
+                .collect(),
+        });
+    }
+
+    if !state.memory.is_empty() {
+        manifest.push(ManifestEntry {
+            category: "Memory",
+            items: state
+                .memory
+                .iter()
+                .filter_map(|(p, _)| p.file_name().map(|n| n.to_string_lossy().into_owned()))
+                .collect(),
+        });
+    }
+
+    if !state.claude_mds.is_empty() {
+        manifest.push(ManifestEntry {
+            category: "CLAUDE.md",
+            items: state
+                .claude_mds
+                .iter()
+                .filter_map(|(p, _)| {
+                    p.file_name().map(|n| {
+                        if p.parent().is_some_and(|parent| {
+                            parent.file_name().is_some_and(|d| d == ".claude")
+                        }) {
+                            format!(".claude/{}", n.to_string_lossy())
+                        } else {
+                            n.to_string_lossy().into_owned()
+                        }
+                    })
+                })
+                .collect(),
+        });
+    }
+
+    manifest
 }
 
 /// Run project audit on the given directory.
@@ -320,6 +426,29 @@ mod tests {
         std::fs::write(commands.join("evil.txt"), "evil text").unwrap();
         let state = collect_state(dir.path());
         assert_eq!(state.commands.len(), 2, "should collect all file types");
+    }
+
+    #[test]
+    fn manifest_lists_all_contents() {
+        let dir = tempfile::tempdir().unwrap();
+        let claude_dir = dir.path().join(".claude");
+        let commands = claude_dir.join("commands");
+        let agents = claude_dir.join("agents");
+        let hooks = claude_dir.join("hooks");
+        std::fs::create_dir_all(&commands).unwrap();
+        std::fs::create_dir_all(&agents).unwrap();
+        std::fs::create_dir_all(&hooks).unwrap();
+        std::fs::write(commands.join("help.md"), "# Help").unwrap();
+        std::fs::write(agents.join("researcher.md"), "# Research").unwrap();
+        std::fs::write(hooks.join("setup.sh"), "#!/bin/bash\necho hi").unwrap();
+        std::fs::write(dir.path().join("CLAUDE.md"), "# Project").unwrap();
+
+        let state = collect_state(dir.path());
+        let manifest = build_manifest(&state);
+        assert!(manifest.iter().any(|m| m.category == "Commands"));
+        assert!(manifest.iter().any(|m| m.category == "Agents"));
+        assert!(manifest.iter().any(|m| m.category == "Hooks"));
+        assert!(manifest.iter().any(|m| m.category == "CLAUDE.md"));
     }
 
     #[test]
