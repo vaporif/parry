@@ -36,11 +36,10 @@ async fn start_daemon_with(dir: &Path, config: Config, idle_timeout: Duration) -
     for _ in 0..50 {
         tokio::time::sleep(Duration::from_millis(100)).await;
         let rd2 = rd.clone();
-        let ready = tokio::task::spawn_blocking(move || {
-            parry_daemon::is_daemon_running(Some(&rd2))
-        })
-        .await
-        .unwrap();
+        let ready =
+            tokio::task::spawn_blocking(move || parry_daemon::is_daemon_running(Some(&rd2)))
+                .await
+                .unwrap();
         if ready {
             // Settle time so daemon re-enters accept loop after our ping
             tokio::time::sleep(Duration::from_millis(50)).await;
@@ -92,11 +91,10 @@ async fn daemon_e2e() {
         let handle = start_daemon_with(dir.path(), config, Duration::from_secs(30)).await;
 
         let rd = dir.path().to_path_buf();
-        let running = tokio::task::spawn_blocking(move || {
-            parry_daemon::is_daemon_running(Some(&rd))
-        })
-        .await
-        .unwrap();
+        let running =
+            tokio::task::spawn_blocking(move || parry_daemon::is_daemon_running(Some(&rd)))
+                .await
+                .unwrap();
         assert!(running);
         eprintln!("[ping/pong] ok ({:?})", t.elapsed());
 
@@ -108,8 +106,7 @@ async fn daemon_e2e() {
     {
         let dir = tempfile::tempdir().unwrap();
         let config = fast_config(dir.path());
-        let handle =
-            start_daemon_with(dir.path(), config.clone(), Duration::from_secs(30)).await;
+        let handle = start_daemon_with(dir.path(), config.clone(), Duration::from_secs(30)).await;
 
         eprintln!("[scan] clean text...");
         let result = scan_with_retry("The weather is nice today.", &config).await;
@@ -125,8 +122,7 @@ async fn daemon_e2e() {
         eprintln!("[scan] injection ok ({:?})", t.elapsed());
 
         eprintln!("[scan] secret (fast scan)...");
-        let result =
-            scan_with_retry("aws_access_key_id = AKIAIOSFODNN7EXAMPLE", &config).await;
+        let result = scan_with_retry("aws_access_key_id = AKIAIOSFODNN7EXAMPLE", &config).await;
         assert_eq!(result.unwrap(), ScanResult::Secret);
         eprintln!("[scan] secret ok ({:?})", t.elapsed());
 
@@ -141,22 +137,20 @@ async fn daemon_e2e() {
         let _handle = start_daemon_with(dir.path(), config, Duration::from_secs(1)).await;
 
         let rd = dir.path().to_path_buf();
-        let running = tokio::task::spawn_blocking(move || {
-            parry_daemon::is_daemon_running(Some(&rd))
-        })
-        .await
-        .unwrap();
+        let running =
+            tokio::task::spawn_blocking(move || parry_daemon::is_daemon_running(Some(&rd)))
+                .await
+                .unwrap();
         assert!(running);
 
         eprintln!("[idle] waiting for timeout...");
         tokio::time::sleep(Duration::from_secs(2)).await;
 
         let rd = dir.path().to_path_buf();
-        let running = tokio::task::spawn_blocking(move || {
-            parry_daemon::is_daemon_running(Some(&rd))
-        })
-        .await
-        .unwrap();
+        let running =
+            tokio::task::spawn_blocking(move || parry_daemon::is_daemon_running(Some(&rd)))
+                .await
+                .unwrap();
         assert!(!running);
         eprintln!("[idle] ok ({:?})", t.elapsed());
     }
@@ -173,8 +167,7 @@ async fn ml_model_e2e() {
     {
         let dir = tempfile::tempdir().unwrap();
         let config = fast_config(dir.path());
-        let handle =
-            start_daemon_with(dir.path(), config.clone(), Duration::from_secs(60)).await;
+        let handle = start_daemon_with(dir.path(), config.clone(), Duration::from_secs(60)).await;
         eprintln!("[fast] daemon ready ({:?})", t.elapsed());
 
         for prompt in [
@@ -209,8 +202,7 @@ async fn ml_model_e2e() {
     {
         let dir = tempfile::tempdir().unwrap();
         let config = full_config(dir.path());
-        let handle =
-            start_daemon_with(dir.path(), config.clone(), Duration::from_secs(120)).await;
+        let handle = start_daemon_with(dir.path(), config.clone(), Duration::from_secs(120)).await;
         eprintln!("[full] daemon ready ({:?})", t.elapsed());
 
         for prompt in [
