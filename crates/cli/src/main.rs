@@ -155,8 +155,8 @@ fn run_audit(hook_input: &parry_hook::HookInput, config: &Config) -> ExitCode {
         return ExitCode::SUCCESS;
     };
 
-    let result = match parry_hook::project_audit::scan(&dir, config) {
-        Ok(r) => r,
+    let warnings = match parry_hook::project_audit::scan(&dir, config) {
+        Ok(w) => w,
         Err(e) => {
             warn!(%e, "audit ML scan failed (fail-closed)");
             eprintln!("parry: project audit failed — ML scanner unavailable: {e}");
@@ -164,17 +164,13 @@ fn run_audit(hook_input: &parry_hook::HookInput, config: &Config) -> ExitCode {
         }
     };
 
-    if result.manifest.is_empty() && result.warnings.is_empty() {
+    if warnings.is_empty() {
         debug!("audit clean (cached)");
         return ExitCode::SUCCESS;
     }
 
-    let message = parry_hook::project_audit::format_output(&result);
-    info!(
-        warnings = result.warnings.len(),
-        manifest_entries = result.manifest.len(),
-        "audit complete"
-    );
+    let message = parry_hook::project_audit::format_warnings(&warnings);
+    info!(count = warnings.len(), "audit warnings");
     let output = parry_hook::HookOutput::user_prompt_warning(&message);
     match serde_json::to_string(&output) {
         Ok(json) => println!("{json}"),
