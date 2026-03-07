@@ -18,7 +18,7 @@ fn init_tracing() {
         .map(std::path::PathBuf::from)
         .map_or_else(
             || {
-                parry_daemon::transport::parry_dir().and_then(|dir| {
+                parry_daemon::transport::parry_dir(None).and_then(|dir| {
                     std::fs::create_dir_all(&dir)?;
                     std::fs::OpenOptions::new()
                         .create(true)
@@ -67,6 +67,7 @@ fn main() -> ExitCode {
         threshold: cli.threshold,
         ignore_paths: cli.ignore_path,
         scan_mode: cli.scan_mode,
+        runtime_dir: None,
     };
 
     match cli.command {
