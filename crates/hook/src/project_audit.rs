@@ -105,10 +105,14 @@ fn collect_dir_files(dir: &Path, ext_filter: Option<&str>) -> Vec<(PathBuf, Stri
 fn hash_state(state: &AuditState) -> u64 {
     let mut hasher = blake3::Hasher::new();
 
+    hasher.update(b"commands\0");
     hash_path_entries(&mut hasher, &state.commands);
+    hasher.update(b"agents\0");
     hash_path_entries(&mut hasher, &state.agents);
+    hasher.update(b"memory\0");
     hash_path_entries(&mut hasher, &state.memory);
 
+    hasher.update(b"settings\0");
     for (name, content) in &state.settings {
         hasher.update(name.as_bytes());
         hasher.update(b"\0");
@@ -116,6 +120,7 @@ fn hash_state(state: &AuditState) -> u64 {
         hasher.update(b"\0");
     }
 
+    hasher.update(b"hooks\0");
     for (name, content) in &state.hooks {
         hasher.update(name.as_bytes());
         hasher.update(b"\0");
