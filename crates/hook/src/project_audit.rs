@@ -72,8 +72,9 @@ fn collect_state(dir: &Path) -> AuditState {
         for entry in files {
             if entry.path().is_file() {
                 let name = entry.file_name().to_string_lossy().into_owned();
-                let content = std::fs::read_to_string(entry.path()).unwrap_or_default();
-                hooks.push((name, content));
+                if let Ok(content) = std::fs::read_to_string(entry.path()) {
+                    hooks.push((name, content));
+                }
             }
         }
     }
